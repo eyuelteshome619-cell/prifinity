@@ -212,6 +212,7 @@ def get_user_ratings():
 
 
 @users_bp.route('/wishlist', methods=['GET'])
+@users_bp.route('/list', methods=['GET'])
 @token_required
 def get_wishlist():
     """Get user's wishlist"""
@@ -220,7 +221,7 @@ def get_wishlist():
     
     query = """
         SELECT w.*, i.title, i.description, i.item_type, i.genre, 
-               i.cover_image, i.avg_rating, i.is_ethiopian
+               i.cover_image, i.avg_rating, i.is_ethiopian, i.creator
         FROM wishlist w
         JOIN items i ON w.item_id = i.id
         WHERE w.user_id = %s
@@ -234,58 +235,42 @@ def get_wishlist():
     query += " ORDER BY w.added_at DESC"
     
     wishlist = execute_query(query, tuple(params))
-    
     return jsonify({'wishlist': wishlist}), 200
 
-
 @users_bp.route('/wishlist', methods=['POST'])
+@users_bp.route('/add', methods=['POST'])
 @token_required
 def add_to_wishlist():
     """Add item to wishlist"""
     user_id = g.current_user['id']
     data = request.get_json()
-    
     item_id = data.get('item_id')
     notes = data.get('notes', '')
     
     if not item_id:
         return jsonify({'error': 'item_id is required'}), 400
     
-    # Check if item exists
-    item = execute_query(
-        "SELECT id FROM items WHERE id = %s",
-        (item_id,),
-        fetch_one=True
-    )
-    
-    if not item:
-        return jsonify({'error': 'Item not found'}), 404
-    
-    # Check if already in wishlist
+    try:
+        execute_query(
+            "INSERT INTO wishlist (user_id, item_id, notes) VALUES (%s, %s, %s)",
+            (user_id, item_id, notes),
+            fetch_all=False
+        )
+        return jsonify({'message': 'Item added to wishlist'}), 201
+    except:
+        return jsonify({'error': 'Already in wishlist'}), 400
+
+@users_bp.route('/check/<int:item_id>', methods=['GET'])
+@token_required
+def check_wishlist(item_id):
+    """Check if item is in wishlist"""
+    user_id = g.current_user['id']
     existing = execute_query(
         "SELECT id FROM wishlist WHERE user_id = %s AND item_id = %s",
         (user_id, item_id),
         fetch_one=True
     )
-    
-    if existing:
-        return jsonify({'error': 'Item already in wishlist'}), 409
-    
-    execute_query(
-        "INSERT INTO wishlist (user_id, item_id, notes) VALUES (%s, %s, %s)",
-        (user_id, item_id, notes),
-        fetch_all=False
-    )
-    
-    # Log activity
-    execute_query(
-        """INSERT INTO user_activity (user_id, activity_type, item_id)
-           VALUES (%s, 'wishlist', %s)""",
-        (user_id, item_id),
-        fetch_all=False
-    )
-    
-    return jsonify({'message': 'Item added to wishlist'}), 201
+    return jsonify({'in_wishlist': existing is not None}), 200
 
 
 @users_bp.route('/wishlist/<int:item_id>', methods=['DELETE'])
