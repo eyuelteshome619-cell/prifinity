@@ -59,9 +59,9 @@ def create_app(config_name='default'):
     def method_not_allowed(error):
         return {'error': 'Method not allowed', 'message': str(error)}, 405
 
-    @app.errorhandler(500)
-    def internal_server_error(error):
-        return {'error': 'Internal server error', 'message': str(error)}, 500
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        return {'error': 'Internal server error', 'message': str(e)}, 500
 
     # Catch-all for API 404s
     @app.route('/api/', defaults={'path': ''})

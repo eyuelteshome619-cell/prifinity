@@ -92,7 +92,8 @@ async function apiRequest<T>(
   }
   
   if (!response.ok) {
-    throw new Error(data.error || `Request failed with status ${response.status}`);
+    const errorMsg = data.message && data.error ? `${data.error} - ${data.message}` : data.error || data.message;
+    throw new Error(errorMsg || `Request failed with status ${response.status}`);
   }
   
   return data;
