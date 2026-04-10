@@ -92,8 +92,10 @@ def sync_external_item():
         return jsonify({'error': 'Could not fetch external details and no fallback provided'}), 404
         
     # 3. Create or update local item
+    main_item_id = item['id'] if item else None
+    
     try:
-        if item_id:
+        if main_item_id:
             # Update base item with full info
             execute_query(
                 """UPDATE items 
@@ -105,13 +107,13 @@ def sync_external_item():
                     data.get('genre', 'Other'),
                     data.get('cover_image', ''),
                     data.get('popularity', 0),
-                    item_id
+                    main_item_id
                 ),
                 fetch_all=False
             )
         else:
             # Insert base item
-            item_id = execute_query(
+            main_item_id = execute_query(
                 """INSERT INTO items (title, description, genre, item_type, cover_image, popularity_score, external_id)
                    VALUES (%s, %s, %s, %s, %s, %s, %s)""",
                 (
@@ -132,7 +134,7 @@ def sync_external_item():
                 """INSERT INTO movies (item_id, director, release_year) 
                    VALUES (%s, %s, %s)
                    ON DUPLICATE KEY UPDATE director=%s, release_year=%s""",
-                (item_id, data.get('creator', 'Unknown'), data.get('release_year'),
+                (main_item_id, data.get('creator', 'Unknown'), data.get('release_year'),
                  data.get('creator', 'Unknown'), data.get('release_year')),
                 fetch_all=False
             )
@@ -143,7 +145,7 @@ def sync_external_item():
                 """INSERT INTO music (item_id, artist, album, release_year, spotify_id) 
                    VALUES (%s, %s, %s, %s, %s)
                    ON DUPLICATE KEY UPDATE artist=%s, album=%s, release_year=%s, spotify_id=%s""",
-                (item_id, creator, album, data.get('release_year'), external_id,
+                (main_item_id, creator, album, data.get('release_year'), external_id,
                  creator, album, data.get('release_year'), external_id),
                 fetch_all=False
             )
@@ -152,15 +154,16 @@ def sync_external_item():
                 """INSERT INTO books (item_id, author, publication_year) 
                    VALUES (%s, %s, %s)
                    ON DUPLICATE KEY UPDATE author=%s, publication_year=%s""",
-                (item_id, data.get('creator', 'Unknown'), data.get('release_year'),
+                (main_item_id, data.get('creator', 'Unknown'), data.get('release_year'),
                  data.get('creator', 'Unknown'), data.get('release_year')),
                 fetch_all=False
             )
             
         return jsonify({
-            'message': 'Item synced successfully' if not item_id else 'Item updated successfully',
-            'item_id': item_id
+            'message': 'Item synced successfully' if not item else 'Item updated successfully',
+            'item_id': main_item_id
         }), 201
         
     except Exception as e:
+        print(f"Sync error details: {str(e)}")
         return jsonify({'error': str(e)}), 500
