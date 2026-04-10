@@ -106,14 +106,15 @@ class MediaAPIService:
         try:
             auth_response = requests.post(
                 auth_url, 
-                headers={"Authorization": f"Basic {auth_base64}"},
+                headers={"Authorization": f"Basic {auth_base64}", "Content-Type": "application/x-www-form-urlencoded"},
                 data={"grant_type": "client_credentials"},
                 timeout=10
             )
+            auth_response.raise_for_status()
             token = auth_response.json().get('access_token')
         except Exception as e:
-            print(f"Spotify Auth Error: {e}")
-            return []
+            print(f"Spotify Auth Error: {auth_response.text if 'auth_response' in locals() else e}")
+            raise Exception("Spotify Configuration Error: Client ID or Secret is invalid.")
 
         if not token: return []
 
@@ -143,7 +144,7 @@ class MediaAPIService:
             return []
         except Exception as e:
             print(f"Spotify API Error: {e}")
-            return []
+            raise Exception(f"Spotify Search Failed: {str(e)}")
 
     # --- Google Books ---
     @staticmethod
