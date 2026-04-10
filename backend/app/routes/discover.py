@@ -28,7 +28,7 @@ def set_synced(results):
 @discover_bp.route('/trending', methods=['GET'])
 def get_trending():
     item_type = request.args.get('type', 'movie')
-    if item_type not in ['movie', 'book']: return jsonify({'results': []}), 200
+    if item_type not in ['movie', 'book', 'music']: return jsonify({'results': []}), 200
     
     try:
         results = MediaAPIService.get_trending(item_type)
@@ -40,7 +40,7 @@ def get_trending():
 def search_external():
     item_type = request.args.get('type', 'movie')
     query = request.args.get('q', '')
-    if item_type not in ['movie', 'book'] or not query: return jsonify({'results': []}), 200
+    if item_type not in ['movie', 'book', 'music'] or not query: return jsonify({'results': []}), 200
     
     try:
         results = MediaAPIService.search(item_type, query)
@@ -52,8 +52,8 @@ def search_external():
 @token_required
 def sync_external_item():
     data = request.get_json()
-    if not data or data.get('item_type') not in ['movie', 'book']: 
-        return jsonify({'error': 'Only Movie and Book sync is enabled right now'}), 400
+    if not data or data.get('item_type') not in ['movie', 'book', 'music']: 
+        return jsonify({'error': 'Unsupported item type'}), 400
     
     ext_id = data.get('external_id')
     item_type = data.get('item_type')

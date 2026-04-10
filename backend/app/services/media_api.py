@@ -29,6 +29,8 @@ class MediaAPIService:
             return MediaAPIService._search_tmdb(query)
         elif item_type == 'book':
             return MediaAPIService._search_google_books(query)
+        elif item_type == 'music':
+            return MediaAPIService._search_itunes(query)
         return []
 
     @staticmethod
@@ -37,6 +39,8 @@ class MediaAPIService:
             return MediaAPIService._search_tmdb("trending")
         elif item_type == 'book':
             return MediaAPIService._search_google_books("subject:fiction|nonfiction")
+        elif item_type == 'music':
+            return MediaAPIService._search_itunes("2024 hits")
         return []
 
     @staticmethod
@@ -48,7 +52,7 @@ class MediaAPIService:
         params = {"api_key": api_key, "query": query, "language": "en-US"}
         
         try:
-            resp = requests.get(url, params=params, timeout=10)
+            resp = requests.get(url, params=params, timeout=5)
             if resp.status_code == 200:
                 results = []
                 for m in resp.json().get('results', [])[:20]:
@@ -78,7 +82,7 @@ class MediaAPIService:
         if api_key: params["key"] = api_key
         
         try:
-            resp = requests.get(url, params=params, timeout=10)
+            resp = requests.get(url, params=params, timeout=5)
             if resp.status_code == 200:
                 results = []
                 for b in resp.json().get('items', []):
@@ -99,4 +103,28 @@ class MediaAPIService:
                 return results
         except Exception as e:
             print(f"Book Search Error: {e}")
+        return []
+
+    @staticmethod
+    def _search_itunes(query):
+        url = "https://itunes.apple.com/search"
+        params = {"term": query, "media": "music", "entity": "song", "limit": 12}
+        try:
+            resp = requests.get(url, params=params, timeout=5)
+            if resp.status_code == 200:
+                results = []
+                for t in resp.json().get('results', []):
+                    results.append({
+                        'external_id': f"itunes_{t['trackId']}",
+                        'title': t.get('trackName'),
+                        'creator': t.get('artistName'),
+                        'album': t.get('collectionName'),
+                        'genre': t.get('primaryGenreName', 'Music'),
+                        'item_type': 'music',
+                        'cover_image': t.get('artworkUrl100', '').replace('100x100bb', '600x600bb'),
+                        'release_year': t.get('releaseDate', '')[:4],
+                        'popularity': 70
+                    })
+                return results
+        except: pass
         return []

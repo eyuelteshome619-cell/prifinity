@@ -25,10 +25,8 @@ class RecommendationEngine:
     
     def collaborative_filtering(self, user_id, item_type=None, limit=20):
         """
-        User-User Collaborative Filtering using cosine similarity
-        Recommends items based on similar users' preferences
+        User-User Collaborative Filtering with Popularity Fallback
         """
-        # Get all users' ratings
         ratings_query = """
             SELECT r.user_id, r.item_id, r.rating, i.item_type
             FROM ratings r
@@ -39,7 +37,7 @@ class RecommendationEngine:
         
         all_ratings = execute_query(ratings_query)
         
-        if not all_ratings:
+        if not all_ratings or len(set(r['user_id'] for r in all_ratings)) < 2:
             return self.cold_start_recommendations(item_type, limit)
         
         # Build user-item rating matrix
@@ -52,22 +50,19 @@ class RecommendationEngine:
         user_idx = {u: i for i, u in enumerate(users)}
         item_idx = {it: i for i, it in enumerate(items)}
         
-        # Create rating matrix
         matrix = np.zeros((len(users), len(items)))
         for r in all_ratings:
             matrix[user_idx[r['user_id']], item_idx[r['item_id']]] = r['rating']
         
-        # Calculate user similarity
         user_similarity = cosine_similarity(matrix)
-        
-        # Get similar users
         target_idx = user_idx[user_id]
-        similar_users = np.argsort(user_similarity[target_idx])[::-1][1:11]  # Top 10 similar users
         
-        # Get items rated by current user
+        # Get similar users (excluding self)
+        similar_score_indices = np.argsort(user_similarity[target_idx])[::-1]
+        similar_users = [idx for idx in similar_score_indices if idx != target_idx][:10]
+        
         user_rated = set(r['item_id'] for r in all_ratings if r['user_id'] == user_id)
         
-        # Calculate weighted recommendations
         item_scores = defaultdict(float)
         for sim_idx in similar_users:
             similarity = user_similarity[target_idx, sim_idx]
@@ -76,26 +71,22 @@ class RecommendationEngine:
                     if r['user_id'] == users[sim_idx] and r['item_id'] not in user_rated:
                         item_scores[r['item_id']] += similarity * r['rating']
         
-        # Sort and get top recommendations
         recommended_ids = sorted(item_scores.keys(), key=lambda x: item_scores[x], reverse=True)[:limit]
         
         if not recommended_ids:
             return self.cold_start_recommendations(item_type, limit)
         
-        # Fetch item details
         return self._fetch_items_with_scores(recommended_ids, item_scores, 'collaborative')
     
     def content_based_filtering(self, user_id, item_type=None, limit=20):
         """
-        Content-Based Filtering using TF-IDF on genres and descriptions
-        Recommends items similar to what user has liked
+        Content-Based Filtering with expanded search
         """
-        # Get user's highly rated items (4+ stars)
         user_ratings = execute_query(
-            """SELECT i.id, i.title, i.genre, i.description, i.item_type, r.rating
+            """SELECT i.id, i.genre, i.description, r.rating
                FROM ratings r
                JOIN items i ON r.item_id = i.id
-               WHERE r.user_id = %s AND r.rating >= 4
+               WHERE r.user_id = %s AND r.rating >= 3
                ORDER BY r.rating DESC""",
             (user_id,)
         )
@@ -103,101 +94,75 @@ class RecommendationEngine:
         if not user_ratings:
             return self.cold_start_recommendations(item_type, limit)
         
-        # Get all items
         items_query = "SELECT id, title, genre, description, item_type, is_ethiopian, avg_rating FROM items"
         if item_type:
             items_query += f" WHERE item_type = '{item_type}'"
         
         all_items = execute_query(items_query)
+        if len(all_items) < 2:
+            return self.cold_start_recommendations(item_type, limit)
         
-        if not all_items:
-            return []
-        
-        # Create content features (genre + description)
-        def create_features(item):
-            return f"{item.get('genre', '')} {item.get('description', '')}"
-        
-        # Build TF-IDF matrix
-        all_features = [create_features(item) for item in all_items]
+        liked_ids = set(r['id'] for r in user_ratings)
         
         try:
-            vectorizer = TfidfVectorizer(stop_words='english', max_features=1000)
+            def create_features(item):
+                return f"{item.get('genre', 'Other')} {item.get('description', '')[:200]}"
+            
+            all_features = [create_features(item) for item in all_items]
+            vectorizer = TfidfVectorizer(stop_words='english', max_features=500)
             tfidf_matrix = vectorizer.fit_transform(all_features)
+            
+            item_id_to_idx = {item['id']: idx for idx, item in enumerate(all_items)}
+            liked_indices = [item_id_to_idx[id] for id in liked_ids if id in item_id_to_idx]
+            
+            if not liked_indices:
+                return self.cold_start_recommendations(item_type, limit)
+                
+            user_profile = np.asarray(tfidf_matrix[liked_indices].mean(axis=0)).flatten()
+            similarities = cosine_similarity([user_profile], tfidf_matrix)[0]
+            
+            item_scores = {all_items[idx]['id']: similarities[idx] for idx in range(len(all_items)) if all_items[idx]['id'] not in liked_ids}
+            recommended_ids = sorted(item_scores.keys(), key=lambda x: item_scores[x], reverse=True)[:limit]
+            
+            if not recommended_ids:
+                return self.cold_start_recommendations(item_type, limit)
+            return self._fetch_items_with_scores(recommended_ids, item_scores, 'content_based')
         except:
             return self.cold_start_recommendations(item_type, limit)
-        
-        # Calculate similarity for user's liked items
-        liked_ids = set(r['id'] for r in user_ratings)
-        item_id_to_idx = {item['id']: idx for idx, item in enumerate(all_items)}
-        
-        # Get indices of liked items
-        liked_indices = [item_id_to_idx[id] for id in liked_ids if id in item_id_to_idx]
-        
-        if not liked_indices:
-            return self.cold_start_recommendations(item_type, limit)
-        
-        # Calculate average profile of liked items
-        liked_vectors = tfidf_matrix[liked_indices]
-        user_profile = np.asarray(liked_vectors.mean(axis=0)).flatten()
-        
-        # Calculate similarity to all items
-        similarities = cosine_similarity([user_profile], tfidf_matrix)[0]
-        
-        # Score items
-        item_scores = {}
-        for idx, item in enumerate(all_items):
-            if item['id'] not in liked_ids:
-                item_scores[item['id']] = similarities[idx]
-        
-        # Sort and get top recommendations
-        recommended_ids = sorted(item_scores.keys(), key=lambda x: item_scores[x], reverse=True)[:limit]
-        
-        if not recommended_ids:
-            return self.cold_start_recommendations(item_type, limit)
-        
-        return self._fetch_items_with_scores(recommended_ids, item_scores, 'content_based')
-    
+
     def hybrid_recommendations(self, user_id, item_type=None, limit=20, ethiopian_boost=False):
         """
-        Hybrid approach combining collaborative and content-based filtering
-        Uses weighted combination of both algorithms
+        Hybrid approach with Guarantee of Results
         """
-        # Get recommendations from both algorithms
-        collab_recs = self.collaborative_filtering(user_id, item_type, limit * 2)
-        content_recs = self.content_based_filtering(user_id, item_type, limit * 2)
+        collab_recs = self.collaborative_filtering(user_id, item_type, limit)
+        content_recs = self.content_based_filtering(user_id, item_type, limit)
         
-        # Combine scores with weights
         combined_scores = {}
-        collab_weight = 0.6
-        content_weight = 0.4
-        
-        for rec in collab_recs:
-            combined_scores[rec['id']] = rec['score'] * collab_weight
-        
+        for rec in collab_recs: combined_scores[rec['id']] = rec['score'] * 0.5
         for rec in content_recs:
-            if rec['id'] in combined_scores:
-                combined_scores[rec['id']] += rec['score'] * content_weight
-            else:
-                combined_scores[rec['id']] = rec['score'] * content_weight
+            if rec['id'] in combined_scores: combined_scores[rec['id']] += rec['score'] * 0.5
+            else: combined_scores[rec['id']] = rec['score'] * 0.5
         
-        # Apply Ethiopian boost if enabled
+        # Ethiopian boost
         if ethiopian_boost:
-            ethiopian_items = execute_query(
-                "SELECT id FROM items WHERE is_ethiopian = TRUE"
-            )
-            ethiopian_ids = set(item['id'] for item in ethiopian_items)
-            
             for item_id in combined_scores:
-                if item_id in ethiopian_ids:
-                    combined_scores[item_id] *= self.ethiopian_boost_factor
+                # Optimized: We already have the items in the recs lists
+                is_eth = any(r['id'] == item_id and r.get('is_ethiopian') for r in collab_recs + content_recs)
+                if is_eth: combined_scores[item_id] *= self.ethiopian_boost_factor
         
-        # Sort and limit
         sorted_ids = sorted(combined_scores.keys(), key=lambda x: combined_scores[x], reverse=True)[:limit]
         
-        if not sorted_ids:
-            return self.cold_start_recommendations(item_type, limit)
-        
-        return self._fetch_items_with_scores(sorted_ids, combined_scores, 'hybrid')
+        # FINAL GUARANTEE: If empty or too short, fill with popular items the user hasn't rated
+        if len(sorted_ids) < limit:
+            extras = self.cold_start_recommendations(item_type, limit)
+            user_rated = set(r['item_id'] for r in execute_query("SELECT item_id FROM ratings WHERE user_id=%s", (user_id,)))
+            for ex in extras:
+                if ex['id'] not in combined_scores and ex['id'] not in user_rated:
+                    combined_scores[ex['id']] = 0.1 # Low priority
+                    sorted_ids.append(ex['id'])
+                    if len(sorted_ids) >= limit: break
+
+        return self._fetch_items_with_scores(sorted_ids[:limit], combined_scores, 'hybrid')
     
     def cross_domain_recommendations(self, user_id, limit=20):
         """
