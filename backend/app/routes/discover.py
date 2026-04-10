@@ -9,14 +9,16 @@ def set_synced(results):
     if not results: return {'results': []}
     
     external_ids = [r['external_id'] for r in results]
-    if not external_ids: return {'results': results}
-    
     placeholders = ', '.join(['%s'] * len(external_ids))
-    synced = execute_query(
-        f"SELECT external_id FROM items WHERE external_id IN ({placeholders})",
-        tuple(external_ids)
-    )
-    synced_ids = {s['external_id'] for s in synced}
+    
+    try:
+        synced = execute_query(
+            f"SELECT external_id FROM items WHERE external_id IN ({placeholders})",
+            tuple(external_ids)
+        )
+        synced_ids = {s['external_id'] for s in synced}
+    except:
+        synced_ids = set()
     
     for r in results:
         r['is_synced'] = r['external_id'] in synced_ids
@@ -26,8 +28,10 @@ def set_synced(results):
 @discover_bp.route('/trending', methods=['GET'])
 def get_trending():
     item_type = request.args.get('type', 'movie')
+    if item_type != 'movie': return jsonify({'results': []}), 200
+    
     try:
-        results = MediaAPIService.get_trending(item_type)
+        results = MediaAPIService.get_trending('movie')
         return jsonify(set_synced(results)), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -36,10 +40,10 @@ def get_trending():
 def search_external():
     item_type = request.args.get('type', 'movie')
     query = request.args.get('q', '')
-    if not query: return jsonify({'results': []}), 200
+    if item_type != 'movie' or not query: return jsonify({'results': []}), 200
     
     try:
-        results = MediaAPIService.search(item_type, query)
+        results = MediaAPIService.search('movie', query)
         return jsonify(set_synced(results)), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -48,59 +52,41 @@ def search_external():
 @token_required
 def sync_external_item():
     data = request.get_json()
-    if not data: return jsonify({'error': 'No data provided'}), 400
+    if not data or data.get('item_type') != 'movie': 
+        return jsonify({'error': 'Only Movie sync is enabled right now'}), 400
     
     ext_id = data.get('external_id')
-    item_type = data.get('item_type')
-    if not ext_id or not item_type: return jsonify({'error': 'Missing ID or Type'}), 400
-
     try:
         # Check if exists
-        existing = execute_query(
-            "SELECT id FROM items WHERE external_id = %s",
-            (ext_id,), fetch_one=True
-        )
-        
-        # Clean Year
-        raw_year = data.get('release_year')
-        try:
-            clean_year = int(str(raw_year)[:4]) if raw_year else None
-        except:
-            clean_year = None
+        item = execute_query("SELECT id FROM items WHERE external_id = %s", (ext_id,), fetch_one=True)
+        item_id = item['id'] if item else None
 
-        if existing:
-            item_id = existing['id']
-            # Update basic info
+        # Format Year
+        year = None
+        if data.get('release_year'):
+            try: year = int(str(data['release_year'])[:4])
+            except: pass
+
+        if item_id:
+            # Update
             execute_query(
                 "UPDATE items SET title=%s, cover_image=%s WHERE id=%s",
                 (data['title'], data.get('cover_image'), item_id), fetch_all=False
             )
         else:
-            # Insert new
+            # Insert
             item_id = execute_query(
                 """INSERT INTO items (title, description, genre, item_type, cover_image, popularity_score, external_id)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                (data['title'], data.get('description', ''), data.get('genre', 'Other'), 
-                 item_type, data.get('cover_image', ''), data.get('popularity', 0), ext_id),
-                fetch_all=False
+                   VALUES (%s, %s, %s, 'movie', %s, %s, %s)""",
+                (data['title'], data.get('description', ''), data.get('genre', 'Movie'), 
+                 data.get('cover_image'), data.get('popularity', 0), ext_id), fetch_all=False
             )
 
-        # Type specific
-        if item_type == 'movie':
-            execute_query(
-                "INSERT INTO movies (item_id, director, release_year) VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE director=%s",
-                (item_id, data.get('creator', 'Unknown'), clean_year, data.get('creator', 'Unknown')), fetch_all=False
-            )
-        elif item_type == 'music':
-            execute_query(
-                "INSERT INTO music (item_id, artist, album, release_year, spotify_id) VALUES (%s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE artist=%s",
-                (item_id, data.get('creator', 'Unknown'), data.get('album', ''), clean_year, ext_id, data.get('creator', 'Unknown')), fetch_all=False
-            )
-        elif item_type == 'book':
-            execute_query(
-                "INSERT INTO books (item_id, author, publication_year) VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE author=%s",
-                (item_id, data.get('creator', 'Unknown'), clean_year, data.get('creator', 'Unknown')), fetch_all=False
-            )
+        # Movie specifically
+        execute_query(
+            "INSERT INTO movies (item_id, director, release_year) VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE release_year=%s",
+            (item_id, data.get('creator', 'Director'), year, year), fetch_all=False
+        )
             
         return jsonify({'message': 'Synced', 'item_id': item_id}), 201
     except Exception as e:
