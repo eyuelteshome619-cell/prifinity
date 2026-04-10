@@ -55,7 +55,10 @@ class Database:
                 # Insert default TMDB placeholder if it doesn't exist
                 cursor.execute("""
                 INSERT IGNORE INTO site_settings (config_key, config_value, config_group, description) 
-                VALUES ('TMDB_API_KEY', '', 'api_keys', 'The Movie Database API Key (v3)')
+                VALUES 
+                ('TMDB_API_KEY', '', 'api_keys', 'The Movie Database API Key (v3)'),
+                ('SPOTIFY_CLIENT_ID', '', 'api_keys', 'Spotify Developer Client ID'),
+                ('SPOTIFY_CLIENT_SECRET', '', 'api_keys', 'Spotify Developer Client Secret')
                 """)
                 # Ensure items table has external_id for TMDB sync
                 try:
