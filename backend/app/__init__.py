@@ -48,7 +48,23 @@ def create_app(config_name='default'):
     # Health check endpoint
     @app.route('/api/health')
     def health_check():
-        return {'status': 'healthy', 'message': 'API is running'}
+        try:
+            from app.utils.database import Database
+            conn = Database.get_connection()
+            conn.close()
+            db_status = "Connected"
+            db_error = None
+        except Exception as e:
+            db_status = "Disconnected"
+            db_error = str(e)
+            
+        return {
+            'status': 'healthy', 
+            'message': 'API is running',
+            'database': db_status,
+            'database_error': db_error,
+            'host_configured': app.config.get('MYSQL_HOST')
+        }
 
     # Global error handlers
     @app.errorhandler(404)
