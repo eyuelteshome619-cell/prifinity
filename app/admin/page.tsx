@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, Package, Coins, TrendingUp, Activity, Star, ShieldCheck, Settings } from "lucide-react";
+import { Users, Package, Coins, TrendingUp, Activity, Star, ShieldCheck, Settings, Globe } from "lucide-react";
 import Link from "next/link";
 import { adminApi } from "@/lib/api";
 import { useLanguage } from "@/lib/language-context";

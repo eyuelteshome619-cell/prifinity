@@ -23,7 +23,8 @@ import {
   Check,
   Heart,
   Brain,
-  ShieldCheck
+  ShieldCheck,
+  Globe
 } from "lucide-react";
 import {
   DropdownMenu,
