@@ -19,6 +19,10 @@ def get_trending():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+@discover_bp.route('/version', methods=['GET'])
+def get_version():
+    return jsonify({'version': '1.0.10', 'status': 'Master Patch Applied'}), 200
+
 def set_synced(results):
     """Augment search results with local database IDs if they exist and are complete"""
     if not results: return jsonify({'results': []}), 200
