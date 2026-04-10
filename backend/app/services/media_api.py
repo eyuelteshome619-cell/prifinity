@@ -153,12 +153,11 @@ class MediaAPIService:
         if item_type == 'movie':
             return MediaAPIService._get_trending_movies()
         elif item_type == 'music':
-            # Spotify doesn't have a direct 'trending' global API for search without specific chart IDs
-            # We'll search for popular new hits as a proxy
-            return MediaAPIService._search_spotify("popular hits 2024")
+            # Spotify requires intelligent search tags to find tracks instead of playlist names
+            return MediaAPIService._search_spotify("year:2024")
         elif item_type == 'book':
             # Search for bestsellers proxy
-            return MediaAPIService._search_google_books("bestsellers 2024")
+            return MediaAPIService._search_google_books("bestsellers")
         return []
 
     # --- TMDB (Trending) ---
