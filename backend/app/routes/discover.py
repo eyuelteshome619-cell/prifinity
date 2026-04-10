@@ -17,16 +17,18 @@ def get_trending():
         trending = MediaAPIService.get_trending(item_type)
         return set_synced(trending)
     except Exception as e:
+        print(f"TRENDING ERROR: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
 @discover_bp.route('/version', methods=['GET'])
 def get_version():
-    return jsonify({'version': '1.0.10', 'status': 'Master Patch Applied'}), 200
+    return jsonify({'version': '1.0.12', 'status': 'Final Stable Fix'}), 200
 
 def set_synced(results):
     """Augment search results with local database IDs if they exist and are complete"""
     if not results: return jsonify({'results': []}), 200
     
+    # Identify items that are already in the local database
     for r in results:
         ext_id = r.get('external_id')
         item_type = r.get('item_type')
@@ -38,7 +40,7 @@ def set_synced(results):
                     fetch_one=True
                 )
                 if db_item:
-                    # VERIFY: Ensure the item actually exists in its subtype table too
+                    # VERIFY: Ensure the item actually exists in its specific subtype table
                     table_map = {'movie': 'movies', 'music': 'music', 'book': 'books'}
                     subtype = execute_query(
                         f"SELECT item_id FROM {table_map[item_type]} WHERE item_id = %s",
@@ -49,7 +51,6 @@ def set_synced(results):
                         r['id'] = db_item['id']
                         r['is_synced'] = True
                     else:
-                        # Orphan item! Items row exists but type-specific row is missing
                         r['id'] = None
                         r['is_synced'] = False
                 else:
@@ -58,6 +59,7 @@ def set_synced(results):
             except:
                 r['id'] = None
                 r['is_synced'] = False
+    
     return jsonify({'results': results}), 200
 
 @discover_bp.route('/search', methods=['GET'])
@@ -73,11 +75,13 @@ def search_external():
         results = MediaAPIService.search(item_type, query)
         return set_synced(results)
     except Exception as e:
+        print(f"SEARCH ERROR: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
 @discover_bp.route('/sync', methods=['POST'])
 @token_required
 def sync_external_item():
+    """Save an external item to the local database"""
     data = request.get_json()
     external_id = data.get('external_id')
     item_type = data.get('item_type')
@@ -85,10 +89,10 @@ def sync_external_item():
     if not external_id or not item_type:
         return jsonify({'error': 'Missing identification fields'}), 400
 
-    # 1. Truncate long strings to prevent DB crashes (VARCHAR 255 limit)
+    # 1. Truncate long strings to prevent DB crashes (MySQL column limits)
     data['title'] = str(data.get('title', 'Unknown'))[:250]
     if data.get('description'):
-        data['description'] = str(data['description'])[:2000] # TEXT limit is safe but let's be safe
+        data['description'] = str(data['description'])[:2000]
     if data.get('genre'):
         data['genre'] = str(data['genre'])[:90]
     if data.get('creator'):
@@ -96,7 +100,7 @@ def sync_external_item():
     if data.get('album'):
         data['album'] = str(data['album'])[:250]
 
-    # 2. Check if already exists (and is complete)
+    # 2. Check if already exists in main table
     item = execute_query(
         "SELECT id FROM items WHERE external_id = %s AND item_type = %s",
         (external_id, item_type),
@@ -107,7 +111,7 @@ def sync_external_item():
     
     try:
         if main_item_id:
-            # Update base item
+            # Update existing base record
             execute_query(
                 """UPDATE items 
                    SET title=%s, description=%s, genre=%s, cover_image=%s, popularity_score=%s
@@ -117,7 +121,7 @@ def sync_external_item():
                 fetch_all=False
             )
         else:
-            # Insert base item
+            # Create new base record
             main_item_id = execute_query(
                 """INSERT INTO items (title, description, genre, item_type, cover_image, popularity_score, external_id)
                    VALUES (%s, %s, %s, %s, %s, %s, %s)""",
@@ -126,14 +130,14 @@ def sync_external_item():
                 fetch_all=False
             )
         
-        # 3. Clean release_year
+        # 3. Handle release year safely
         raw_year = data.get('release_year')
         try:
             clean_year = int(str(raw_year)[:4]) if raw_year and str(raw_year).strip() else None
         except:
             clean_year = None
 
-        # 4. Insert or Update type-specific details
+        # 4. Handle Sub-table Details (Movies, Music, Books)
         if item_type == 'movie':
             execute_query(
                 """INSERT INTO movies (item_id, director, release_year) 
@@ -144,14 +148,14 @@ def sync_external_item():
                 fetch_all=False
             )
         elif item_type == 'music':
-            creator = data.get('creator') or data.get('artist') or 'Unknown Artist'
+            artist = data.get('creator') or data.get('artist') or 'Unknown Artist'
             album = data.get('album') or ''
             execute_query(
                 """INSERT INTO music (item_id, artist, album, release_year, spotify_id) 
                    VALUES (%s, %s, %s, %s, %s)
                    ON DUPLICATE KEY UPDATE artist=%s, album=%s, release_year=%s, spotify_id=%s""",
-                (main_item_id, creator, album, clean_year, external_id,
-                 creator, album, clean_year, external_id),
+                (main_item_id, artist, album, clean_year, external_id,
+                 artist, album, clean_year, external_id),
                 fetch_all=False
             )
         elif item_type == 'book':
@@ -167,5 +171,5 @@ def sync_external_item():
         return jsonify({'message': 'Success', 'item_id': main_item_id}), 201
         
     except Exception as e:
-        print(f"MASTER SYNC ERROR: {str(e)}")
+        print(f"CRITICAL SYNC ERROR: {str(e)}")
         return jsonify({'error': str(e)}), 500
