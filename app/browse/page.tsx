@@ -82,7 +82,24 @@ function BrowseContent() {
         page,
         per_page: 12,
       });
-      setItems(data.items);
+      let combinedResults: any[] = [...data.items];
+
+      // Automatically inject live global trending items when browsing without a search
+      if (page === 1 && !searchQuery) {
+        try {
+          const trendingType = type && type !== 'all' ? type : 'movie';
+          const trendingData = await discoveryAPI.getTrending(trendingType);
+          if (trendingData.results && trendingData.results.length > 0) {
+            const localExternalIds = new Set(combinedResults.map(i => i.external_id).filter(Boolean));
+            const newTrending = trendingData.results.filter((t: any) => !localExternalIds.has(t.external_id));
+            combinedResults = [...combinedResults, ...newTrending];
+          }
+        } catch (err) {
+          console.error("Live auto-populate failed:", err);
+        }
+      }
+
+      setItems(combinedResults as Item[]);
       setPagination(data.pagination);
     } catch (error) {
       console.error('Failed to fetch items:', error);
