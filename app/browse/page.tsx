@@ -94,8 +94,9 @@ function BrowseContent() {
             const newTrending = trendingData.results.filter((t: any) => !localExternalIds.has(t.external_id));
             combinedResults = [...combinedResults, ...newTrending];
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("Live auto-populate failed:", err);
+          toast.error("Global Feed Error: " + (err.message || "Invalid API Keys in Settings"));
         }
       }
 
@@ -155,8 +156,9 @@ function BrowseContent() {
           const newGlobalItems = globalData.results.filter((g: any) => !localExternalIds.has(g.external_id));
           combinedResults = [...combinedResults, ...newGlobalItems];
         }
-      } catch (extErr) {
+      } catch (extErr: any) {
         console.error("Live Global Search Failed:", extErr);
+        toast.error("Spotify/TMDB Failed: " + (extErr.message || "Invalid API Keys"));
       }
 
       setItems(combinedResults as Item[]);
