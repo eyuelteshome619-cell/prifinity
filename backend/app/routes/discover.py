@@ -17,50 +17,28 @@ def get_trending():
         trending = MediaAPIService.get_trending(item_type)
         return set_synced(trending)
     except Exception as e:
-        print(f"TRENDING ERROR: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
-@discover_bp.route('/version', methods=['GET'])
-def get_version():
-    return jsonify({'version': '1.0.12', 'status': 'Final Stable Fix'}), 200
+def set_synced(items_list):
+    if not items_list: return jsonify({'results': []}), 200
+    
+    external_ids = [item['external_id'] for item in items_list]
+    placeholders = ', '.join(['%s'] * len(external_ids))
+    
+    local_items = execute_query(
+        f"SELECT id, external_id FROM items WHERE external_id IN ({placeholders})",
+        tuple(external_ids)
+    )
+    
+    mapping = {item['external_id']: item['id'] for item in local_items}
+    
+    for item in items_list:
+        item['local_id'] = mapping.get(item['external_id'])
+        item['is_synced'] = item['local_id'] is not None
+        if item['is_synced']:
+            item['id'] = item['local_id']
 
-def set_synced(results):
-    """Augment search results with local database IDs if they exist and are complete"""
-    if not results: return jsonify({'results': []}), 200
-    
-    # Identify items that are already in the local database
-    for r in results:
-        ext_id = r.get('external_id')
-        item_type = r.get('item_type')
-        if ext_id:
-            try:
-                db_item = execute_query(
-                    "SELECT id FROM items WHERE external_id = %s AND item_type = %s",
-                    (ext_id, item_type),
-                    fetch_one=True
-                )
-                if db_item:
-                    # VERIFY: Ensure the item actually exists in its specific subtype table
-                    table_map = {'movie': 'movies', 'music': 'music', 'book': 'books'}
-                    subtype = execute_query(
-                        f"SELECT item_id FROM {table_map[item_type]} WHERE item_id = %s",
-                        (db_item['id'],),
-                        fetch_one=True
-                    )
-                    if subtype:
-                        r['id'] = db_item['id']
-                        r['is_synced'] = True
-                    else:
-                        r['id'] = None
-                        r['is_synced'] = False
-                else:
-                    r['id'] = None
-                    r['is_synced'] = False
-            except:
-                r['id'] = None
-                r['is_synced'] = False
-    
-    return jsonify({'results': results}), 200
+    return jsonify({'results': items_list}), 200
 
 @discover_bp.route('/search', methods=['GET'])
 def search_external():
@@ -75,69 +53,89 @@ def search_external():
         results = MediaAPIService.search(item_type, query)
         return set_synced(results)
     except Exception as e:
-        print(f"SEARCH ERROR: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
 @discover_bp.route('/sync', methods=['POST'])
 @token_required
 def sync_external_item():
-    """Save an external item to the local database"""
+    """Silent sync an external item to the local DB"""
     data = request.get_json()
-    external_id = data.get('external_id')
-    item_type = data.get('item_type')
+    if not data or 'external_id' not in data or 'item_type' not in data:
+        return jsonify({'error': 'external_id and item_type are required'}), 400
+        
+    external_id = data['external_id']
+    item_type = data['item_type']
     
-    if not external_id or not item_type:
-        return jsonify({'error': 'Missing identification fields'}), 400
-
-    # 1. Truncate long strings to prevent DB crashes (MySQL column limits)
-    data['title'] = str(data.get('title', 'Unknown'))[:250]
-    if data.get('description'):
-        data['description'] = str(data['description'])[:2000]
-    if data.get('genre'):
-        data['genre'] = str(data['genre'])[:90]
-    if data.get('creator'):
-        data['creator'] = str(data['creator'])[:250]
-    if data.get('album'):
-        data['album'] = str(data['album'])[:250]
-
-    # 2. Check if already exists in main table
+    # 1. Check if already exists
     item = execute_query(
-        "SELECT id FROM items WHERE external_id = %s AND item_type = %s",
+        "SELECT id, description FROM items WHERE external_id = %s AND item_type = %s",
         (external_id, item_type),
         fetch_one=True
     )
     
+    # If exists and has description, we consider it "full"
+    if item and item.get('description') and len(item['description']) > 100:
+        return jsonify({
+            'message': 'Item already synced and complete',
+            'item_id': item['id']
+        }), 200
+        
+    item_id = item['id'] if item else None
+        
+    # 2. Always get full details from external API for sync to ensure complete record (full description, director, etc.)
+    full_details = MediaAPIService.get_external_details(item_type, external_id)
+    if full_details:
+        # Prioritize full details from API over basic info from trending list
+        data.update(full_details)
+    elif 'title' not in data:
+        # Only error if we have NO title and API failed
+        return jsonify({'error': 'Could not fetch external details and no fallback provided'}), 404
+        
+    # 3. Create or update local item
     main_item_id = item['id'] if item else None
     
     try:
         if main_item_id:
-            # Update existing base record
+            # Update base item with full info
             execute_query(
                 """UPDATE items 
                    SET title=%s, description=%s, genre=%s, cover_image=%s, popularity_score=%s
                    WHERE id=%s""",
-                (data['title'], data.get('description', ''), data.get('genre', 'Other'), 
-                 data.get('cover_image', ''), data.get('popularity', 0), main_item_id),
+                (
+                    data['title'],
+                    data.get('description', ''),
+                    data.get('genre', 'Other'),
+                    data.get('cover_image', ''),
+                    data.get('popularity', 0),
+                    main_item_id
+                ),
                 fetch_all=False
             )
         else:
-            # Create new base record
+            # Insert base item
             main_item_id = execute_query(
                 """INSERT INTO items (title, description, genre, item_type, cover_image, popularity_score, external_id)
                    VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                (data['title'], data.get('description', ''), data.get('genre', 'Other'), item_type, 
-                 data.get('cover_image', ''), data.get('popularity', 0), external_id),
+                (
+                    data['title'],
+                    data.get('description', ''),
+                    data.get('genre', 'Other'),
+                    item_type,
+                    data.get('cover_image', ''),
+                    data.get('popularity', 0),
+                    external_id
+                ),
                 fetch_all=False
             )
         
-        # 3. Handle release year safely
+        # Clean release_year (prevent empty string crash on INT column)
         raw_year = data.get('release_year')
         try:
             clean_year = int(str(raw_year)[:4]) if raw_year and str(raw_year).strip() else None
         except:
             clean_year = None
 
-        # 4. Handle Sub-table Details (Movies, Music, Books)
+        # Insert or Update type-specific details
         if item_type == 'movie':
             execute_query(
                 """INSERT INTO movies (item_id, director, release_year) 
@@ -148,14 +146,14 @@ def sync_external_item():
                 fetch_all=False
             )
         elif item_type == 'music':
-            artist = data.get('creator') or data.get('artist') or 'Unknown Artist'
+            creator = data.get('creator') or data.get('artist') or 'Unknown Artist'
             album = data.get('album') or ''
             execute_query(
                 """INSERT INTO music (item_id, artist, album, release_year, spotify_id) 
                    VALUES (%s, %s, %s, %s, %s)
                    ON DUPLICATE KEY UPDATE artist=%s, album=%s, release_year=%s, spotify_id=%s""",
-                (main_item_id, artist, album, clean_year, external_id,
-                 artist, album, clean_year, external_id),
+                (main_item_id, creator, album, clean_year, external_id,
+                 creator, album, clean_year, external_id),
                 fetch_all=False
             )
         elif item_type == 'book':
@@ -168,8 +166,14 @@ def sync_external_item():
                 fetch_all=False
             )
             
-        return jsonify({'message': 'Success', 'item_id': main_item_id}), 201
+        print(f"SUCCESS: Synced item {main_item_id} ({item_type})")
+        return jsonify({
+            'message': 'Item synced successfully' if not item else 'Item updated successfully',
+            'item_id': main_item_id
+        }), 201
         
     except Exception as e:
-        print(f"CRITICAL SYNC ERROR: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"SYNC ERROR: {error_trace}")
+        return jsonify({'error': f"Database Sync Failed: {str(e)}"}), 500

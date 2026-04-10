@@ -68,16 +68,20 @@ export default function ItemDetailPage({ params }: PageProps) {
     fetchItemData();
   }, [id]);
 
-  const fetchItemData = async (retryCount = 0) => {
+  const fetchItemData = async (isRetry = false) => {
     setIsLoading(true);
     
     try {
-      const resp = await itemsAPI.getItem(parseInt(id));
+      const [itemData, similarData] = await Promise.all([
+        itemsAPI.getItem(parseInt(id)),
+        isAuthenticated ? recommendationsAPI.getSimilarItems(parseInt(id), 4) : Promise.resolve({ similar_items: [] }),
+      ]);
       
-      setItem(resp.item);
-      setDetails(resp.details);
-      setEthiopianMetadata(resp.ethiopian_metadata);
-      setRatings(resp.ratings);
+      setItem(itemData.item);
+      setDetails(itemData.details);
+      setEthiopianMetadata(itemData.ethiopian_metadata);
+      setRatings(itemData.ratings);
+      setSimilarItems(similarData.similar_items);
 
       // Check wishlist status
       if (isAuthenticated) {
@@ -85,29 +89,20 @@ export default function ItemDetailPage({ params }: PageProps) {
         setIsInWishlist(wishlistData.wishlist.some((w) => w.id === parseInt(id)));
       }
 
-      // Check for Spotify embed
-      if (resp.item.item_type === 'music' && resp.details.spotify_id) {
-        setSpotifyId(resp.details.spotify_id);
-      }
-
-      // Fetch similar items in parallel
-      if (isAuthenticated) {
-        recommendationsAPI.getSimilarItems(parseInt(id), 4).then(sim => {
-          setSimilarItems(sim.similar_items);
-        }).catch(() => {});
+      // Check for Spotify embed if music
+      if (itemData.item.item_type === 'music' && itemData.details.spotify_id) {
+        setSpotifyId(itemData.details.spotify_id);
       }
     } catch (error: any) {
-      console.error('Fetch error:', error);
-      // AUTO-RETRY once after 1.5s if it's potentially a database propagation lag
-      if (retryCount < 1) {
-        console.log("Item not found yet, retrying in 1.5s...");
-        setTimeout(() => fetchItemData(retryCount + 1), 1500);
+      // Smart Retry: If not found, wait 1.5s and try one last time (handles DB sync latency)
+      if (!isRetry && (error.message?.includes('404') || error.message?.includes('not found'))) {
+        console.log("Item not found, retrying in 1.5s...");
+        setTimeout(() => fetchItemData(true), 1500);
         return;
       }
+      console.error('Failed to fetch item:', error);
     } finally {
-      if (retryCount >= 0) { // Only stop loading if we're not waiting for a retry
-         setIsLoading(false);
-      }
+      setIsLoading(false);
     }
   };
 
