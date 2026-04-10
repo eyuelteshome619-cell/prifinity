@@ -114,7 +114,7 @@ export const translations: Record<string, any> = {
       action_music: "Browse Music",
       action_books: "Browse Books",
       recs_title: "Your Recommendations",
-      recs_desc: "AI-powered picks based on your taste (5 credits per refresh)",
+      recs_desc: "AI-powered picks based on your taste (1 credit per refresh)",
       refresh: "Refresh",
       tab_all: "All",
       tab_movies: "Movies",
@@ -124,9 +124,9 @@ export const translations: Record<string, any> = {
       rate_to_get_recs: "Rate some content to get personalized recommendations",
       start_browsing: "Start Browsing",
       toast_insufficient_credits: "Insufficient credits",
-      toast_insufficient_credits_desc: "You need at least 5 credits to get recommendations.",
+      toast_insufficient_credits_desc: "You need at least 1 credit to get recommendations.",
       toast_refresh_success: "Recommendations refreshed!",
-      toast_refresh_success_desc: "-5 credits",
+      toast_refresh_success_desc: "-1 credit",
       toast_refresh_failed: "Failed to refresh recommendations"
     },
     profile: {
@@ -415,7 +415,7 @@ export const translations: Record<string, any> = {
       action_music: "ሙዚቃዎችን ያስሱ",
       action_books: "መጻሕፍትን ያስሱ",
       recs_title: "የእርስዎ ምክረ-ሃሳቦች",
-      recs_desc: "በእርስዎ ምርጫ ላይ የተመሰረቱ በአርቴፊሻል ኢንተለጀንስ የተመረጡ ምርጫዎች (በእያንዳንዱ ማደስ 5 ክሬዲት)",
+      recs_desc: "በእርስዎ ምርጫ ላይ የተመሰረቱ በአርቴፊሻል ኢንተለጀንስ የተመረጡ ምርጫዎች (በእያንዳንዱ ማደስ 1 ክሬዲት)",
       refresh: "አድስ",
       tab_all: "ሁሉም",
       tab_movies: "ፊልሞች",
@@ -425,9 +425,9 @@ export const translations: Record<string, any> = {
       rate_to_get_recs: "ግላዊ የሆኑ ምክረ-ሃሳቦችን ለማግኘት የተወሰኑ ይዘቶችን ደረጃ ይስጡ",
       start_browsing: "ማሰስ ይጀምሩ",
       toast_insufficient_credits: "በቂ ክሬዲት የለም",
-      toast_insufficient_credits_desc: "ምክረ-ሃሳቦችን ለማግኘት ቢያንስ 5 ክሬዲት ያስፈልግዎታል።",
+      toast_insufficient_credits_desc: "ምክረ-ሃሳቦችን ለማግኘት ቢያንስ 1 ክሬዲት ያስፈልግዎታል።",
       toast_refresh_success: "ምክረ-ሃሳቦች ታድሰዋል!",
-      toast_refresh_success_desc: "-5 ክሬዲቶች",
+      toast_refresh_success_desc: "-1 ክሬዲት",
       toast_refresh_failed: "ምክረ-ሃሳቦችን ማደስ አልተቻለም"
     },
     profile: {
