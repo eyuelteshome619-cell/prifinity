@@ -318,6 +318,79 @@ class RecommendationEngine:
             item['explanation'] = 'Popular and highly rated'
         
         return items
+
+    def fast_personalized_recommendations(self, user_id, item_type=None, limit=10):
+        """
+        Lightweight SQL-based personalized recommendations that use user's top-rated genres.
+        This is a fast fallback that does not require heavy ML libraries and works well
+        when scikit-learn / numpy are unavailable or the heavy engine is slow.
+        """
+        # Determine user's top genres by average rating weighted by count
+        genre_stats = execute_query(
+            """SELECT i.genre, AVG(r.rating) as avg_rating, COUNT(*) as cnt
+               FROM ratings r
+               JOIN items i ON r.item_id = i.id
+               WHERE r.user_id = %s
+               GROUP BY i.genre
+               HAVING COUNT(*) >= 1
+               ORDER BY avg_rating DESC, cnt DESC
+               LIMIT 5""",
+            (user_id,)
+        )
+
+        if not genre_stats:
+            return []
+
+        # Build prioritized list of genres
+        top_genres = [g['genre'] for g in genre_stats if g.get('genre')]
+
+        # Exclude items the user already rated
+        rated_rows = execute_query("SELECT item_id FROM ratings WHERE user_id = %s", (user_id,)) or []
+        rated_ids = {r['item_id'] for r in rated_rows}
+
+        recommendations = []
+        for genre in top_genres:
+            params = [f'%{genre}%']
+            query = """SELECT i.*, 
+                       CASE WHEN i.item_type = 'book' THEN b.author
+                            WHEN i.item_type = 'movie' THEN m.director
+                            WHEN i.item_type = 'music' THEN mu.artist END as creator
+                       FROM items i
+                       LEFT JOIN books b ON i.id = b.item_id
+                       LEFT JOIN movies m ON i.id = m.item_id
+                       LEFT JOIN music mu ON i.id = mu.item_id
+                       WHERE i.genre LIKE %s
+                       """
+            if item_type:
+                query += " AND i.item_type = %s"
+                params.append(item_type)
+
+            query += " ORDER BY i.avg_rating DESC, i.popularity_score DESC LIMIT %s"
+            params.append(limit)
+
+            rows = execute_query(query, tuple(params)) or []
+            for r in rows:
+                if r['id'] in rated_ids:
+                    continue
+                r['score'] = (r.get('avg_rating') or 0) / 5.0 + (r.get('popularity_score') or 0) / 200.0
+                r['explanation'] = f"Because you liked {genre} content"
+                recommendations.append(r)
+                if len(recommendations) >= limit:
+                    break
+            if len(recommendations) >= limit:
+                break
+
+        # Remove duplicates and sort by computed score
+        seen = set()
+        unique = []
+        for rec in recommendations:
+            if rec['id'] in seen:
+                continue
+            seen.add(rec['id'])
+            unique.append(rec)
+
+        unique.sort(key=lambda x: x.get('score', 0), reverse=True)
+        return unique[:limit]
     
     def find_similar_items(self, item_id, limit=10):
         """

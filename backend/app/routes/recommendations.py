@@ -44,17 +44,30 @@ def get_recommendations():
                 future.cancel()
                 raise
 
+    # Fast personalized heuristic for quick responses (no heavy ML libraries)
+    try:
+        fast_recs = engine.fast_personalized_recommendations(user_id, item_type, limit)
+        if fast_recs:
+            recommendations = fast_recs
+            fallback_used = False
+        else:
+            recommendations = None
+    except Exception as e:
+        print(f"FAST PERSONALIZED FAILED: {e}")
+        recommendations = None
+
     # Get recommendations based on algorithm, but guard with timeout and fallbacks
     fallback_used = False
     try:
-        if algorithm == 'collaborative':
-            recommendations = run_with_timeout(lambda: engine.collaborative_filtering(user_id, item_type, limit))
+        if recommendations is None:
+            if algorithm == 'collaborative':
+                recommendations = run_with_timeout(lambda: engine.collaborative_filtering(user_id, item_type, limit))
         elif algorithm == 'content':
-            recommendations = run_with_timeout(lambda: engine.content_based_filtering(user_id, item_type, limit))
+                recommendations = run_with_timeout(lambda: engine.content_based_filtering(user_id, item_type, limit))
         elif algorithm == 'cross_domain':
-            recommendations = run_with_timeout(lambda: engine.cross_domain_recommendations(user_id, limit))
+                recommendations = run_with_timeout(lambda: engine.cross_domain_recommendations(user_id, limit))
         else:  # hybrid (default)
-            recommendations = run_with_timeout(lambda: engine.hybrid_recommendations(user_id, item_type, limit, ethiopian_boost))
+                recommendations = run_with_timeout(lambda: engine.hybrid_recommendations(user_id, item_type, limit, ethiopian_boost))
     except Exception as e:
         print(f"RECOMMENDATION ENGINE ERROR or TIMEOUT: {e}")
         try:
