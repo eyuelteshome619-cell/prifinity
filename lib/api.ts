@@ -169,16 +169,16 @@ export const usersAPI = {
     apiRequest<{ ratings: Rating[] }>(`/users/ratings${type ? `?type=${type}` : ''}`),
   
   getWishlist: (type?: string) =>
-    apiRequest<{ wishlist: WishlistItem[] }>(`/users/wishlist${type ? `?type=${type}` : ''}`),
+    apiRequest<{ wishlist: WishlistItem[] }>(`/wishlist${type ? `?type=${type}` : ''}`),
   
   addToWishlist: (itemId: number, notes?: string) =>
-    apiRequest<{ message: string }>('/users/wishlist', {
+    apiRequest<{ message: string }>('/wishlist/add', {
       method: 'POST',
       body: JSON.stringify({ item_id: itemId, notes }),
     }),
   
   removeFromWishlist: (itemId: number) =>
-    apiRequest<{ message: string }>(`/users/wishlist/${itemId}`, { method: 'DELETE' }),
+    apiRequest<{ message: string }>(`/wishlist/${itemId}`, { method: 'DELETE' }),
   
   getActivity: (limit?: number) =>
     apiRequest<{ activity: UserActivity[] }>(`/users/activity${limit ? `?limit=${limit}` : ''}`),
@@ -645,7 +645,7 @@ export interface NewItemData {
 // Wishlist API
 export const wishlistAPI = {
   getWishlist: () =>
-    apiRequest<{ wishlist: any[] }>('/users/wishlist'),
+    apiRequest<{ wishlist: any[] }>('/wishlist'),
   
   addToWishlist: (itemId: number, notes: string = '') =>
     apiRequest<{ message: string }>('/wishlist/add', {

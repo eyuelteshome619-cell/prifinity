@@ -17,9 +17,17 @@ def get_wishlist():
         SELECT w.id as wishlist_id, w.added_at, w.notes,
                i.id, i.title, i.description, i.genre, i.item_type,
                i.cover_image, i.avg_rating, i.rating_count,
-               i.is_ethiopian, i.creator
+               i.is_ethiopian,
+               CASE
+                   WHEN i.item_type = 'book' THEN b.author
+                   WHEN i.item_type = 'movie' THEN m.director
+                   WHEN i.item_type = 'music' THEN mu.artist
+               END as creator
         FROM wishlist w
         JOIN items i ON w.item_id = i.id
+        LEFT JOIN books b ON i.id = b.item_id AND i.item_type = 'book'
+        LEFT JOIN movies m ON i.id = m.item_id AND i.item_type = 'movie'
+        LEFT JOIN music mu ON i.id = mu.item_id AND i.item_type = 'music'
         WHERE w.user_id = %s
         ORDER BY w.added_at DESC
     """
