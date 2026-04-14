@@ -76,7 +76,6 @@ export default function AdminItemsPage() {
       setItems(response.items || []);
     } catch (error) {
       console.error("Failed to fetch items:", error);
-      // fallback mock removed
       setItems([]);
     } finally {
       setLoading(false);
@@ -130,7 +129,6 @@ export default function AdminItemsPage() {
           genre: formData.genre,
           cover_image: formData.cover_image,
           is_ethiopian: formData.is_ethiopian,
-          // Map creator to type-specific field
           ...(formData.item_type === "book" ? { author: formData.creator } : {}),
           ...(formData.item_type === "movie" ? { director: formData.creator } : {}),
           ...(formData.item_type === "music" ? { artist: formData.creator, spotify_id: formData.spotify_id } : {}),
@@ -422,17 +420,17 @@ export default function AdminItemsPage() {
               <div className="space-y-2 border-l-2 border-purple-500 pl-4 py-1">
                 <label className="text-sm font-medium flex items-center gap-2">
                   <Music className="h-4 w-4 text-purple-500" />
-                  Spotify ID (Track, Album, or Playlist ID)
+                  Last.fm Track URL or MBID
                 </label>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="e.g. 7qiZ3rqv3ABpS699m67oRI"
+                    placeholder="e.g. https://www.last.fm/music/Artist/_/Track or MBID"
                     value={formData.spotify_id}
                     onChange={(e) => setFormData({ ...formData, spotify_id: e.target.value })}
                   />
                 </div>
                 <p className="text-[10px] text-muted-foreground italic">
-                  Find the ID in the Spotify share link (e.g., spotify.com/track/<b>ID</b>)
+                  Provide a Last.fm track URL or MBID. If empty, the system will attempt to find matching metadata.
                 </p>
               </div>
             )}
@@ -471,7 +469,7 @@ export default function AdminItemsPage() {
               Import from Web
             </DialogTitle>
             <DialogDescription>
-              Search movies (TMDB), music (Spotify), and books (Google) to import instantly.
+              Search movies (TMDB), music (iTunes/Last.fm), and books (Google) to import instantly.
             </DialogDescription>
           </DialogHeader>
 

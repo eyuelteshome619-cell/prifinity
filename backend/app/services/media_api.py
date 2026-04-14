@@ -1,5 +1,6 @@
 import requests
 import json
+import urllib.parse
 from flask import current_app
 from app.utils.database import execute_query
 
@@ -30,7 +31,7 @@ class MediaAPIService:
         elif item_type == 'book':
             return MediaAPIService._search_google_books(query)
         elif item_type == 'music':
-            return MediaAPIService._search_itunes(query)
+            return MediaAPIService._search_lastfm(query)
         return []
 
     @staticmethod
@@ -40,7 +41,7 @@ class MediaAPIService:
         elif item_type == 'book':
             return MediaAPIService._search_google_books("subject:fiction|nonfiction")
         elif item_type == 'music':
-            return MediaAPIService._search_itunes("2024 hits")
+            return MediaAPIService._search_lastfm("2024 hits")
         return []
 
     @staticmethod
@@ -107,24 +108,36 @@ class MediaAPIService:
 
     @staticmethod
     def _search_itunes(query):
-        url = "https://itunes.apple.com/search"
-        params = {"term": query, "media": "music", "entity": "song", "limit": 12}
+        # Use Last.fm track.search for music results (prefer Last.fm over Spotify)
+        api_key = MediaAPIService._get_config('LASTFM_API_KEY')
+        if not api_key:
+            return []
+
+        url = 'https://ws.audioscrobbler.com/2.0/'
+        params = {"method": "track.search", "track": query, "api_key": api_key, "format": "json", "limit": 12}
         try:
-            resp = requests.get(url, params=params, timeout=5)
+            resp = requests.get(url, params=params, timeout=6)
             if resp.status_code == 200:
                 results = []
-                for t in resp.json().get('results', []):
+                tracks = resp.json().get('results', {}).get('trackmatches', {}).get('track', [])
+                # Normalize single object to list
+                if isinstance(tracks, dict):
+                    tracks = [tracks]
+                for t in tracks:
+                    title = t.get('name')
+                    artist = t.get('artist')
                     results.append({
-                        'external_id': f"itunes_{t['trackId']}",
-                        'title': t.get('trackName'),
-                        'creator': t.get('artistName'),
-                        'album': t.get('collectionName'),
-                        'genre': t.get('primaryGenreName', 'Music'),
+                        'external_id': t.get('mbid') or f"lastfm_{urllib.parse.quote_plus(artist+'_'+title)}",
+                        'title': title,
+                        'creator': artist,
+                        'album': '',
+                        'genre': 'Music',
                         'item_type': 'music',
-                        'cover_image': t.get('artworkUrl100', '').replace('100x100bb', '600x600bb'),
-                        'release_year': t.get('releaseDate', '')[:4],
-                        'popularity': 70
+                        'cover_image': t.get('image', [{}])[-1].get('#text') if t.get('image') else '',
+                        'release_year': '',
+                        'popularity': 60
                     })
                 return results
-        except: pass
+        except Exception as e:
+            print(f"Last.fm Search Error: {e}")
         return []

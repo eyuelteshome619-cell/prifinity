@@ -33,8 +33,7 @@ def init_db():
             # Insert default placeholders
             settings = [
                 ('TMDB_API_KEY', '', 'api_keys', 'The Movie Database API Key (v3)'),
-                ('SPOTIFY_CLIENT_ID', '', 'api_keys', 'Spotify Developer Client ID'),
-                ('SPOTIFY_CLIENT_SECRET', '', 'api_keys', 'Spotify Developer Client Secret'),
+                ('LASTFM_API_KEY', '', 'api_keys', 'Last.fm API Key'),
                 ('GOOGLE_BOOKS_API_KEY', '', 'api_keys', 'Google Books API Key'),
                 ('SITE_NAME', 'Prefinity AI', 'general', 'Display name of the platform'),
                 ('SITE_DESCRIPTION', 'Advanced Ethiopian Recommendation Engine', 'general', 'Meta description for SEO')

@@ -158,7 +158,7 @@ function BrowseContent() {
         }
       } catch (extErr: any) {
         console.error("Live Global Search Failed:", extErr);
-        toast.error("Spotify/TMDB Failed: " + (extErr.message || "Invalid API Keys"));
+        toast.error("External search failed: " + (extErr.message || "Invalid API Keys"));
       }
 
       setItems(combinedResults as Item[]);

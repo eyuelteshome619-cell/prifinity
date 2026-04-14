@@ -62,7 +62,7 @@ export default function ItemDetailPage({ params }: PageProps) {
   const [userRating, setUserRating] = useState(0);
   const [review, setReview] = useState('');
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
-  const [spotifyId, setSpotifyId] = useState<string | null>(null);
+  const [lastfmUrl, setLastfmUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetchItemData();
@@ -89,9 +89,9 @@ export default function ItemDetailPage({ params }: PageProps) {
         setIsInWishlist(wishlistData.wishlist.some((w) => w.id === parseInt(id)));
       }
 
-      // Check for Spotify embed if music
+      // Check for Last.fm link (previously used spotify_id column)
       if (itemData.item.item_type === 'music' && itemData.details.spotify_id) {
-        setSpotifyId(itemData.details.spotify_id);
+        setLastfmUrl(itemData.details.spotify_id);
       }
     } catch (error: any) {
       // Smart Retry: If not found, wait 1.5s and try one last time (handles DB sync latency)
@@ -308,25 +308,27 @@ export default function ItemDetailPage({ params }: PageProps) {
               </div>
             )}
 
-            {/* Spotify Player */}
-            {spotifyId && (
-              <Card className="overflow-hidden border-green-500/20 shadow-green-500/5">
-                <CardHeader className="bg-green-500/5 pb-4">
-                  <CardTitle className="text-sm font-semibold flex items-center text-green-600">
-                    <Music className="mr-2 h-4 w-4" /> Listen on Spotify
+            {/* Last.fm Link (stored in legacy `spotify_id` field) */}
+            {lastfmUrl && (
+              <Card className="overflow-hidden border-sky-500/20 shadow-sky-500/5">
+                <CardHeader className="bg-sky-500/5 pb-4">
+                  <CardTitle className="text-sm font-semibold flex items-center text-sky-600">
+                    <Music className="mr-2 h-4 w-4" /> View on Last.fm
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <iframe 
-                    src={`https://open.spotify.com/embed/track/${spotifyId}?utm_source=generator`} 
-                    width="100%" 
-                    height="152" 
-                    frameBorder="0" 
-                    allowFullScreen={false} 
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
-                    loading="lazy"
-                    className="block"
-                  ></iframe>
+                <CardContent className="p-4">
+                  <a
+                    href={
+                      lastfmUrl && lastfmUrl.startsWith('http')
+                        ? lastfmUrl
+                        : `https://www.last.fm/search?q=${encodeURIComponent(item.title + ' ' + (details?.artist || ''))}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline"
+                  >
+                    Open on Last.fm
+                  </a>
                 </CardContent>
               </Card>
             )}
