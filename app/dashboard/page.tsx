@@ -30,7 +30,7 @@ import { toast } from 'sonner';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading: authLoading, updateCredits } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, updateCredits, refreshUser } = useAuth();
   const { t } = useLanguage();
   const [recommendations, setRecommendations] = useState<RecommendedItem[]>([]);
   const [discoveryItems, setDiscoveryItems] = useState<any[]>([]);
@@ -67,11 +67,11 @@ export default function DashboardPage() {
       setWishlist(wishlistData.wishlist || []);
       setUserStats(profileData.stats);
       
-      // Update credits after fetching recommendations (they cost credits)
-      // Admin users don't pay credits
-      if (user && user.role !== 'admin') {
-        const newCredits = user.credits - 1; // recommendation cost
-        updateCredits(Math.max(0, newCredits));
+      // Refresh user info to get accurate credits (server-side deduction)
+      try {
+        await refreshUser();
+      } catch (e) {
+        // ignore refresh errors
       }
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
@@ -98,8 +98,11 @@ export default function DashboardPage() {
         algorithm: 'hybrid' 
       });
       setRecommendations(data.recommendations);
-      if (user.role !== 'admin') {
-        updateCredits(user.credits - 1);
+      // Refresh user to sync credits deducted by server
+      try {
+        await refreshUser();
+      } catch (e) {
+        // ignore refresh errors
       }
       toast.success('Recommendations refreshed!', {
         description: user.role === 'admin' ? 'Free for admin' : '-1 credit',

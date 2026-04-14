@@ -2,9 +2,6 @@
 AI Recommendation Engine
 Implements Collaborative Filtering, Content-Based Filtering, and Hybrid approaches
 """
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.feature_extraction.text import TfidfVectorizer
 from collections import defaultdict
 from app.utils.database import execute_query
 from flask import current_app
@@ -27,22 +24,29 @@ class RecommendationEngine:
         """
         User-User Collaborative Filtering with Popularity Fallback
         """
+        # Limit the number of rating rows pulled into memory to avoid large RAM/CPU usage
+        max_ratings = current_app.config.get('RECOMMENDATION_MAX_RATINGS', 5000)
         ratings_query = """
             SELECT r.user_id, r.item_id, r.rating, i.item_type
             FROM ratings r
             JOIN items i ON r.item_id = i.id
         """
+        params = []
         if item_type:
-            ratings_query += f" WHERE i.item_type = '{item_type}'"
-        
-        all_ratings = execute_query(ratings_query)
+            ratings_query += " WHERE i.item_type = %s"
+            params.append(item_type)
+
+        ratings_query += " ORDER BY r.created_at DESC LIMIT %s"
+        params.append(max_ratings)
+
+        all_ratings = execute_query(ratings_query, tuple(params))
         
         if not all_ratings or len(set(r['user_id'] for r in all_ratings)) < 2:
             return self.cold_start_recommendations(item_type, limit)
         
-        # Build user-item rating matrix
-        users = list(set(r['user_id'] for r in all_ratings))
-        items = list(set(r['item_id'] for r in all_ratings))
+        # Build user-item rating matrix from the recent sample
+        users = list({r['user_id'] for r in all_ratings})
+        items = list({r['item_id'] for r in all_ratings})
         
         if user_id not in users:
             return self.cold_start_recommendations(item_type, limit)
@@ -50,11 +54,18 @@ class RecommendationEngine:
         user_idx = {u: i for i, u in enumerate(users)}
         item_idx = {it: i for i, it in enumerate(items)}
         
-        matrix = np.zeros((len(users), len(items)))
-        for r in all_ratings:
-            matrix[user_idx[r['user_id']], item_idx[r['item_id']]] = r['rating']
-        
-        user_similarity = cosine_similarity(matrix)
+        try:
+            import numpy as np
+            from sklearn.metrics.pairwise import cosine_similarity
+
+            matrix = np.zeros((len(users), len(items)))
+            for r in all_ratings:
+                matrix[user_idx[r['user_id']], item_idx[r['item_id']]] = r['rating']
+
+            user_similarity = cosine_similarity(matrix)
+        except Exception:
+            # Fallback to cold start if numeric or ML libs unavailable or error occurs
+            return self.cold_start_recommendations(item_type, limit)
         target_idx = user_idx[user_id]
         
         # Get similar users (excluding self)
@@ -107,8 +118,12 @@ class RecommendationEngine:
         try:
             def create_features(item):
                 return f"{item.get('genre', 'Other')} {item.get('description', '')[:200]}"
-            
+
             all_features = [create_features(item) for item in all_items]
+            # Lazy import sklearn to reduce cold-start overhead
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            from sklearn.metrics.pairwise import cosine_similarity
+
             vectorizer = TfidfVectorizer(stop_words='english', max_features=500)
             tfidf_matrix = vectorizer.fit_transform(all_features)
             
@@ -346,6 +361,9 @@ class RecommendationEngine:
         all_features.insert(0, target_features)
         
         try:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            from sklearn.metrics.pairwise import cosine_similarity
+
             vectorizer = TfidfVectorizer(stop_words='english')
             tfidf_matrix = vectorizer.fit_transform(all_features)
             similarities = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:])[0]
