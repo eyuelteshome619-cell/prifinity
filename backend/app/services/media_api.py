@@ -107,8 +107,8 @@ class MediaAPIService:
         return []
 
     @staticmethod
-    def _search_itunes(query):
-        # Use Last.fm track.search for music results (prefer Last.fm over Spotify)
+    def _search_lastfm(query):
+        # Use Last.fm track.search for music results
         api_key = MediaAPIService._get_config('LASTFM_API_KEY')
         if not api_key:
             return []
@@ -141,3 +141,6 @@ class MediaAPIService:
         except Exception as e:
             print(f"Last.fm Search Error: {e}")
         return []
+
+    # Backwards-compatible alias for older code paths
+    _search_itunes = _search_lastfm
