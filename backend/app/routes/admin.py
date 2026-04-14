@@ -417,11 +417,24 @@ def import_external():
             fetch_all=False
         )
     elif item_type == 'music':
+        # Insert without assuming legacy `spotify_id` column exists.
         execute_query(
-            "INSERT INTO music (item_id, artist, album, release_year, spotify_id) VALUES (%s, %s, %s, %s, %s)",
-            (item_id, data.get('creator', 'Unknown'), data.get('album', ''), data.get('release_year'), data.get('external_id')),
+            "INSERT INTO music (item_id, artist, album, release_year) VALUES (%s, %s, %s, %s)",
+            (item_id, data.get('creator', 'Unknown'), data.get('album', ''), data.get('release_year')),
             fetch_all=False
         )
+        # Attempt to set legacy external id in a best-effort way. If the column
+        # does not exist on older deployments, ignore the error.
+        if data.get('external_id'):
+            try:
+                execute_query(
+                    "UPDATE music SET spotify_id = %s WHERE item_id = %s",
+                    (data.get('external_id'), item_id),
+                    fetch_all=False
+                )
+            except Exception:
+                # Legacy column not present — safe to ignore.
+                pass
     elif item_type == 'book':
         execute_query(
             "INSERT INTO books (item_id, author, publication_year) VALUES (%s, %s, %s)",
