@@ -124,8 +124,10 @@ def get_item(item_id):
             fetch_one=True
         )
     elif item['item_type'] == 'music':
+        # Some deployments may lack the legacy `spotify_id` column.
+        # Use a safe select to avoid raising SQL errors on older DBs.
         details = execute_query(
-            "SELECT *, spotify_id FROM music WHERE item_id = %s",
+            "SELECT * FROM music WHERE item_id = %s",
             (item_id,),
             fetch_one=True
         )
