@@ -37,14 +37,26 @@ def get_recommendations():
     ethiopian_boost = preferences.get('ethiopian_content_preference', False) if preferences else False
     
     # Get recommendations based on algorithm
-    if algorithm == 'collaborative':
-        recommendations = engine.collaborative_filtering(user_id, item_type, limit)
-    elif algorithm == 'content':
-        recommendations = engine.content_based_filtering(user_id, item_type, limit)
-    elif algorithm == 'cross_domain':
-        recommendations = engine.cross_domain_recommendations(user_id, limit)
-    else:  # hybrid (default)
-        recommendations = engine.hybrid_recommendations(user_id, item_type, limit, ethiopian_boost)
+    try:
+        if algorithm == 'collaborative':
+            recommendations = engine.collaborative_filtering(user_id, item_type, limit)
+        elif algorithm == 'content':
+            recommendations = engine.content_based_filtering(user_id, item_type, limit)
+        elif algorithm == 'cross_domain':
+            recommendations = engine.cross_domain_recommendations(user_id, limit)
+        else:  # hybrid (default)
+            recommendations = engine.hybrid_recommendations(user_id, item_type, limit, ethiopian_boost)
+        fallback_used = False
+    except Exception as e:
+        # Log and fall back to cold-start/popular items to avoid 502 from heavy ML operations
+        print(f"RECOMMENDATION ENGINE ERROR: {e}")
+        try:
+            recommendations = engine.cold_start_recommendations(item_type, limit)
+            fallback_used = True
+        except Exception as e2:
+            print(f"COLD-START FALLBACK FAILED: {e2}")
+            recommendations = []
+            fallback_used = True
     
     # Apply Ethiopian content boost if preferred
     if ethiopian_boost:
@@ -68,11 +80,15 @@ def get_recommendations():
         fetch_all=False
     )
     
-    return jsonify({
+    response = {
         'recommendations': recommendations,
         'algorithm': algorithm,
         'count': len(recommendations)
-    }), 200
+    }
+    if 'fallback_used' in locals() and fallback_used:
+        response['fallback'] = True
+
+    return jsonify(response), 200
 
 
 @recommendations_bp.route('/explain/<int:item_id>', methods=['GET'])
