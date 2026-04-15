@@ -66,6 +66,7 @@ export default function AdminItemsPage() {
   const [importResults, setImportResults] = useState<any[]>([]);
   const [importLoading, setImportLoading] = useState(false);
   const [itemImporting, setItemImporting] = useState<string | null>(null);
+  const [importIsEthiopian, setImportIsEthiopian] = useState(false);
 
   useEffect(() => { fetchItems(); }, []);
 
@@ -161,7 +162,9 @@ export default function AdminItemsPage() {
   const handleImportAction = async (item: any) => {
     setItemImporting(item.external_id);
     try {
-      await adminApi.importExternalItem(item);
+      // Send a flag to mark this imported item as Ethiopian when requested
+      const payload = { ...item, is_ethiopian: importIsEthiopian };
+      await adminApi.importExternalItem(payload as any);
       await fetchItems();
       setImportSearchOpen(false);
     } catch (error) {
@@ -494,6 +497,16 @@ export default function AdminItemsPage() {
             <Button onClick={handleImportSearch} disabled={importLoading}>
               {importLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             </Button>
+            <div className="flex items-center gap-3 ml-2">
+              <input
+                type="checkbox"
+                id="import_is_ethiopian"
+                checked={importIsEthiopian}
+                onChange={(e) => setImportIsEthiopian(e.target.checked)}
+                className="rounded border-input w-4 h-4 accent-amber-500"
+              />
+              <label htmlFor="import_is_ethiopian" className="text-sm font-medium cursor-pointer">Mark imported items as Ethiopian</label>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto pr-2 space-y-4 min-h-[400px]">

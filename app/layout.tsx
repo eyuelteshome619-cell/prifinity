@@ -16,7 +16,7 @@ const notoEthiopic = Noto_Sans_Ethiopic({
 });
 
 export const metadata: Metadata = {
-  title: 'Prefinity - AI-Powered Recommendations',
+  title: 'Prefinity',
   description: 'Discover personalized recommendations for movies, music, and books with special focus on Ethiopian content. Powered by AI recommendation engine.',
   keywords: ['recommendations', 'movies', 'music', 'books', 'Ethiopian', 'AI', 'personalized'],
 }

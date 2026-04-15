@@ -46,6 +46,23 @@ export function ItemCard({
   
   const TypeIcon = typeIcons[item.item_type] || Film;
 
+  // Normalize / format score so it never displays above 100%
+  const formattedScore = (() => {
+    if (typeof score !== 'number' || isNaN(score)) return null;
+    let pct = 0;
+    if (score <= 1) {
+      // fraction 0..1
+      pct = Math.round(Math.max(0, score) * 100);
+    } else if (score <= 100) {
+      // already a percent value
+      pct = Math.round(Math.max(0, score));
+    } else {
+      // large numbers: try interpreting as basis points, fallback to cap
+      pct = Math.round(Math.max(0, Math.min(score / 100, 1)) * 100);
+    }
+    return Math.min(pct, 100);
+  })();
+
   useEffect(() => {
     if (isAuthenticated && initialInWishlist === undefined && !isWishlistItem && !isExternal && item.id) {
       checkWishlistStatus();
@@ -135,9 +152,9 @@ export function ItemCard({
           </div>
         )}
         
-        {showScore && score !== undefined && (
+        {showScore && formattedScore !== null && (
           <div className="rounded-full bg-gradient-to-r from-rose-500 to-indigo-600 px-3 py-1 text-[10px] font-black text-white shadow-lg border border-white/20 uppercase tracking-tighter">
-            {Math.round(score * 100)}% Match
+            {formattedScore}% Match
           </div>
         )}
       </div>

@@ -4,29 +4,30 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #e6f7ff; /* Light blue background */
-  --foreground: oklch(0.2 0.01 50); /* Dark Text */
-  --card: oklch(0.99 0.005 80);
-  --card-foreground: oklch(0.2 0.01 50);
-  --popover: oklch(0.99 0.005 80);
-  --popover-foreground: oklch(0.2 0.01 50);
-  --primary: oklch(0.6 0.12 50); /* Darker Warm Brown */
-  --primary-foreground: oklch(0.98 0.01 80);
-  --secondary: oklch(0.94 0.01 80);
-  --secondary-foreground: oklch(0.2 0.01 50);
-  --muted: oklch(0.94 0.01 80);
-  --muted-foreground: oklch(0.45 0.02 50);
-  --accent: oklch(0.92 0.02 80);
-  --accent-foreground: oklch(0.2 0.01 50);
-  --destructive: oklch(0.5 0.15 30);
-  --destructive-foreground: oklch(0.98 0.01 80);
-  --border: oklch(0.88 0.01 80);
-  --input: oklch(0.88 0.01 80);
-  --ring: oklch(0.6 0.12 50);
+  /* Switch default theme to a darker navy blue background */
+  --background: #032a4a; /* Dark navy */
+  --foreground: oklch(0.95 0.01 80); /* Light text */
+  --card: oklch(0.18 0.01 50);
+  --card-foreground: oklch(0.95 0.01 80);
+  --popover: oklch(0.18 0.01 50);
+  --popover-foreground: oklch(0.95 0.01 80);
+  --primary: oklch(0.7 0.1 50);
+  --primary-foreground: oklch(0.15 0.01 50);
+  --secondary: oklch(0.2 0.01 50);
+  --secondary-foreground: oklch(0.95 0.01 80);
+  --muted: oklch(0.2 0.01 50);
+  --muted-foreground: oklch(0.7 0.01 50);
+  --accent: oklch(0.25 0.02 50);
+  --accent-foreground: oklch(0.95 0.01 80);
+  --destructive: oklch(0.45 0.15 30);
+  --destructive-foreground: oklch(0.95 0.01 80);
+  --border: oklch(0.25 0.01 50);
+  --input: oklch(0.25 0.01 50);
+  --ring: oklch(0.7 0.1 50);
   --radius: 1rem;
 
-  --primary-glow: oklch(0.92 0.02 80);
-  --accent-glow: oklch(0.95 0.02 80);
+  --primary-glow: oklch(0.15 0.02 50);
+  --accent-glow: oklch(0.12 0.015 50);
 }
 
 .dark {
