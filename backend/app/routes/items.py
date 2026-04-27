@@ -153,6 +153,15 @@ def get_item(item_id):
            LIMIT 10""",
         (item_id,)
     )
+
+    # Get external/streaming links if available
+    try:
+        external_links = execute_query(
+            "SELECT provider, url FROM external_links WHERE item_id = %s",
+            (item_id,)
+        )
+    except Exception:
+        external_links = []
     
     # Log view if user is authenticated
     from app.utils.auth import get_current_user
@@ -169,7 +178,8 @@ def get_item(item_id):
         'item': item,
         'details': details,
         'ethiopian_metadata': ethiopian_metadata,
-        'ratings': ratings
+        'ratings': ratings,
+        'external_links': external_links
     }), 200
 
 

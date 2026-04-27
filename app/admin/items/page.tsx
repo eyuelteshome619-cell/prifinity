@@ -193,6 +193,11 @@ export default function AdminItemsPage() {
     }
   };
 
+  const displayProvider = (p: string) => {
+    if (!p) return '';
+    return p.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
   // Debounced autosuggest for import search
   useEffect(() => {
     const q = importQuery.trim();
@@ -590,6 +595,21 @@ export default function AdminItemsPage() {
                   <p className="text-xs text-muted-foreground line-clamp-2 mt-2">
                     {item.description}
                   </p>
+                  {item.streaming_links && item.streaming_links.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {item.streaming_links.map((l: any, idx: number) => (
+                        <a
+                          key={idx}
+                          href={l.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs px-2 py-1 rounded bg-primary/10 text-primary"
+                        >
+                          {displayProvider(l.provider)}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                   {item.popularity > 0 && (
                     <div className="flex items-center gap-1 mt-2">
                       <Star className="h-3 w-3 text-amber-500 fill-amber-500" />

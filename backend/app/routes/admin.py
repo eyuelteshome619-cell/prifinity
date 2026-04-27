@@ -393,10 +393,10 @@ def import_external():
         
     item_type = data.get('item_type')
     
-    # 1. Insert into base items table
+    # 1. Insert into base items table (include is_ethiopian if provided)
     item_id = execute_query(
-        """INSERT INTO items (title, description, genre, item_type, cover_image, popularity_score, external_id)
-           VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+        """INSERT INTO items (title, description, genre, item_type, cover_image, popularity_score, external_id, is_ethiopian)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
         (
             data['title'],
             data.get('description', ''),
@@ -404,7 +404,8 @@ def import_external():
             item_type,
             data.get('cover_image', ''),
             data.get('popularity', 0),
-            data.get('external_id')
+            data.get('external_id'),
+            bool(data.get('is_ethiopian', False))
         ),
         fetch_all=False
     )
@@ -441,6 +442,34 @@ def import_external():
             (item_id, data.get('creator', 'Unknown'), data.get('release_year')),
             fetch_all=False
         )
+    # 3. Save external streaming links if provided
+    streaming_links = data.get('streaming_links') or []
+    if streaming_links:
+        # Ensure table exists (best-effort)
+        try:
+            execute_query(
+                """CREATE TABLE IF NOT EXISTS external_links (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    item_id INT NOT NULL,
+                    provider VARCHAR(128),
+                    url VARCHAR(512),
+                    FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+                )""",
+                fetch_all=False
+            )
+        except Exception:
+            # Ignore create errors; proceed to insert if possible
+            pass
+
+        for link in streaming_links:
+            try:
+                execute_query(
+                    "INSERT INTO external_links (item_id, provider, url) VALUES (%s, %s, %s)",
+                    (item_id, link.get('provider'), link.get('url')),
+                    fetch_all=False
+                )
+            except Exception:
+                continue
         
     return jsonify({
         'message': f'{item_type.capitalize()} imported successfully',
