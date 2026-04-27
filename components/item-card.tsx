@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Star, Heart, Film, Music, BookOpen, Loader2, Globe, Play } from 'lucide-react';
+import { Star, Heart, Film, Music, BookOpen, Loader2, Globe, Play, ExternalLink, Copy } from 'lucide-react';
 import { type Item, wishlistAPI, itemsAPI } from '@/lib/api';
 import { useLanguage } from '@/lib/language-context';
 import { useAuth } from '@/lib/auth-context';
@@ -45,6 +45,7 @@ export function ItemCard({
   const [isPending, setIsPending] = useState(false);
   const [spotifyUrl, setSpotifyUrl] = useState<string | null>(null);
   const [spotifyLoading, setSpotifyLoading] = useState(false);
+  const streamingLinks = item.streaming_links || [];
   
   const TypeIcon = typeIcons[item.item_type] || Film;
 
@@ -254,6 +255,50 @@ export function ItemCard({
                   <Play className="h-4 w-4" />
                 </Button>
               ) : null}
+              {/* Streaming links (other providers) */}
+              {streamingLinks.length > 0 && (
+                <div className="flex items-center gap-1">
+                  {streamingLinks.slice(0, 3).map((l, idx) => (
+                    <div key={idx} className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          try { window.open(l.url, '_blank', 'noopener'); } catch {}
+                        }}
+                        title={l.provider}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          try {
+                            if (navigator && (navigator as any).clipboard && l.url) {
+                              (navigator as any).clipboard.writeText(l.url);
+                              // small inline toast
+                              try { window.dispatchEvent(new CustomEvent('prefinity:copied', { detail: l.url })); } catch {}
+                            }
+                          } catch (err) {}
+                        }}
+                        title="Copy link"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  {streamingLinks.length > 3 && (
+                    <Badge className="text-xs">+{streamingLinks.length - 3}</Badge>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

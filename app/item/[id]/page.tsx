@@ -37,7 +37,8 @@ import {
   Loader2,
   ArrowLeft,
   Send
-} from 'lucide-react';
+   } from 'lucide-react';
+   import { Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PageProps {
@@ -354,17 +355,32 @@ export default function ItemDetailPage({ params }: PageProps) {
                   <CardContent className="p-4">
                     <div className="flex flex-col gap-2">
                       {externalLinks.map((l, i) => (
-                        <a
-                          key={i}
-                          href={l.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-primary underline"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                          <span className="font-medium">{displayProvider(l.provider)}</span>
-                          <span className="text-xs text-muted-foreground ml-2 truncate">{l.url}</span>
-                        </a>
+                        <div key={i} className="flex items-center gap-2">
+                          <a
+                            href={l.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-primary underline"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            <span className="font-medium">{displayProvider(l.provider)}</span>
+                          </a>
+                          <span className="text-xs text-muted-foreground ml-2 truncate max-w-[50%]">{l.url}</span>
+                          <button
+                            className="ml-auto text-xs px-2 py-1 rounded bg-white/5 hover:bg-white/10"
+                            onClick={() => {
+                              try {
+                                if (navigator && (navigator as any).clipboard && l.url) {
+                                  (navigator as any).clipboard.writeText(l.url);
+                                  alert('Link copied to clipboard');
+                                }
+                              } catch (err) {}
+                            }}
+                            title="Copy link"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   </CardContent>

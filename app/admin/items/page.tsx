@@ -19,7 +19,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Search, Plus, MoreHorizontal, Star, Edit, Trash2, Film, Music, BookOpen, Loader2, Globe, Activity
+  Search, Plus, MoreHorizontal, Star, Edit, Trash2, Film, Music, BookOpen, Loader2, Globe, Activity, ExternalLink, Copy
 } from "lucide-react";
 import { adminApi, discoveryAPI, itemsAPI, Item, NewItemData } from "@/lib/api";
 
@@ -596,17 +596,34 @@ export default function AdminItemsPage() {
                     {item.description}
                   </p>
                   {item.streaming_links && item.streaming_links.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
+                    <div className="mt-2 flex flex-wrap gap-2 items-center">
                       {item.streaming_links.map((l: any, idx: number) => (
-                        <a
-                          key={idx}
-                          href={l.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs px-2 py-1 rounded bg-primary/10 text-primary"
-                        >
-                          {displayProvider(l.provider)}
-                        </a>
+                        <div key={idx} className="flex items-center gap-2">
+                          <a
+                            href={l.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs px-2 py-1 rounded bg-primary/10 text-primary flex items-center gap-2"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            {displayProvider(l.provider)}
+                          </a>
+                          <button
+                            className="text-xs px-2 py-1 rounded bg-white/5 hover:bg-white/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              try {
+                                if (navigator && (navigator as any).clipboard && l.url) {
+                                  (navigator as any).clipboard.writeText(l.url);
+                                  alert('Link copied to clipboard');
+                                }
+                              } catch (err) {}
+                            }}
+                            title="Copy link"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   )}

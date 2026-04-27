@@ -91,6 +91,7 @@ def get_recommendations():
                 'score': r.get('popularity_score', 0),
                 'title': r.get('title'),
                 'description': r.get('description'),
+                'is_ethiopian': bool(r.get('is_ethiopian'))
             } for r in rows]
             fallback_used = True
         else:
@@ -124,9 +125,20 @@ def get_recommendations():
         print(f"CREDIT DEDUCTION ERROR: {e}")
     
     # Apply Ethiopian content boost if preferred (only available if engine present)
-    if ethiopian_boost and engine:
+    if ethiopian_boost:
         try:
-            recommendations = engine.boost_ethiopian_content(recommendations)
+            if engine:
+                # Let the engine perform its boost when available
+                recommendations = engine.boost_ethiopian_content(recommendations)
+            else:
+                # Simple boost for fallback: increase score for Ethiopian items and reorder
+                for rec in recommendations:
+                    try:
+                        if rec.get('is_ethiopian'):
+                            rec['score'] = (rec.get('score') or 0) + 15
+                    except Exception:
+                        continue
+                recommendations = sorted(recommendations, key=lambda x: x.get('score', 0), reverse=True)
         except Exception:
             pass
     

@@ -392,6 +392,30 @@ def import_external():
         return jsonify({'error': 'Data is required'}), 400
         
     item_type = data.get('item_type')
+
+    # Attempt to enrich missing metadata server-side (description, cover_image, creator, streaming links)
+    try:
+        needs_enrich = not data.get('description') or not data.get('cover_image') or not data.get('creator')
+        if needs_enrich and data.get('title'):
+            candidates = MediaAPIService.search(item_type, data.get('title'))
+            if candidates:
+                best = candidates[0]
+                # Fill missing fields conservatively
+                data['description'] = data.get('description') or best.get('description') or best.get('overview') or ''
+                data['cover_image'] = data.get('cover_image') or best.get('cover_image') or best.get('image') or ''
+                data['creator'] = data.get('creator') or best.get('creator') or best.get('artist') or best.get('author') or ''
+                # Merge streaming links (dedupe by URL)
+                existing_links = data.get('streaming_links') or []
+                best_links = best.get('streaming_links') or []
+                seen = {l.get('url') for l in existing_links if l.get('url')}
+                for l in best_links:
+                    if l.get('url') and l.get('url') not in seen:
+                        existing_links.append(l)
+                        seen.add(l.get('url'))
+                data['streaming_links'] = existing_links
+    except Exception:
+        # Best-effort enrichment — do not fail the import on enrichment errors
+        pass
     
     # 1. Insert into base items table (include is_ethiopian if provided)
     item_id = execute_query(
