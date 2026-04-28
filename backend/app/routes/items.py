@@ -153,6 +153,15 @@ def get_item(item_id):
            LIMIT 10""",
         (item_id,)
     )
+
+    # Get external/streaming links if available
+    try:
+        external_links = execute_query(
+            "SELECT provider, url FROM external_links WHERE item_id = %s",
+            (item_id,)
+        )
+    except Exception:
+        external_links = []
     
     # Log view if user is authenticated
     from app.utils.auth import get_current_user
@@ -169,8 +178,35 @@ def get_item(item_id):
         'item': item,
         'details': details,
         'ethiopian_metadata': ethiopian_metadata,
-        'ratings': ratings
+        'ratings': ratings,
+        'external_links': external_links
     }), 200
+
+
+@items_bp.route('/<int:item_id>/spotify', methods=['GET'])
+def get_item_spotify(item_id):
+    """Return spotify_id for music items if available"""
+    item = execute_query(
+        "SELECT id, item_type FROM items WHERE id = %s",
+        (item_id,),
+        fetch_one=True
+    )
+    if not item:
+        return jsonify({'error': 'Item not found'}), 404
+    if item.get('item_type') != 'music':
+        return jsonify({'error': 'Spotify ID available only for music items'}), 400
+
+    try:
+        music = execute_query(
+            "SELECT spotify_id FROM music WHERE item_id = %s",
+            (item_id,),
+            fetch_one=True
+        )
+        spotify_id = music.get('spotify_id') if music else None
+    except Exception as e:
+        # Older databases may not have spotify_id column; return null instead of failing
+        spotify_id = None
+    return jsonify({'spotify_id': spotify_id}), 200
 
 
 @items_bp.route('/search', methods=['GET'])

@@ -14,7 +14,8 @@ import {
   type Item, 
   type ItemDetails, 
   type EthiopianMetadata,
-  type ItemRating 
+  type ItemRating,
+  type ExternalLink,
 } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,10 +33,12 @@ import {
   User,
   Globe,
   Star,
+  ExternalLink,
   Loader2,
   ArrowLeft,
   Send
-} from 'lucide-react';
+   } from 'lucide-react';
+   import { Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PageProps {
@@ -63,6 +66,7 @@ export default function ItemDetailPage({ params }: PageProps) {
   const [review, setReview] = useState('');
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const [lastfmUrl, setLastfmUrl] = useState<string | null>(null);
+  const [externalLinks, setExternalLinks] = useState<ExternalLink[]>([]);
 
   useEffect(() => {
     fetchItemData();
@@ -82,6 +86,7 @@ export default function ItemDetailPage({ params }: PageProps) {
       setEthiopianMetadata(itemData.ethiopian_metadata);
       setRatings(itemData.ratings);
       setSimilarItems(similarData.similar_items);
+      setExternalLinks(itemData.external_links || (itemData.item && (itemData.item.streaming_links || [])) || []);
 
       // Check wishlist status
       if (isAuthenticated) {
@@ -104,6 +109,11 @@ export default function ItemDetailPage({ params }: PageProps) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const displayProvider = (p: string) => {
+    if (!p) return '';
+    return p.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
   const handleWishlistToggle = async () => {
@@ -332,6 +342,50 @@ export default function ItemDetailPage({ params }: PageProps) {
                 </CardContent>
               </Card>
             )}
+
+              {/* External streaming / preview links returned from backend */}
+              {externalLinks.length > 0 && (
+                <Card className="overflow-hidden border-sky-500/20 shadow-sky-500/5">
+                  <CardHeader className="bg-sky-500/5 pb-4">
+                    <CardTitle className="text-sm font-semibold flex items-center text-sky-600">
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      {t('item_page.streaming_links')}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col gap-2">
+                      {externalLinks.map((l, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <a
+                            href={l.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-primary underline"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            <span className="font-medium">{displayProvider(l.provider)}</span>
+                          </a>
+                          <span className="text-xs text-muted-foreground ml-2 truncate max-w-[50%]">{l.url}</span>
+                          <button
+                            className="ml-auto text-xs px-2 py-1 rounded bg-white/5 hover:bg-white/10"
+                            onClick={() => {
+                              try {
+                                if (navigator && (navigator as any).clipboard && l.url) {
+                                  (navigator as any).clipboard.writeText(l.url);
+                                  alert('Link copied to clipboard');
+                                }
+                              } catch (err) {}
+                            }}
+                            title="Copy link"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
             {/* Details Card */}
             <Card className="bg-white/5 backdrop-blur-md border-white/5 shadow-2xl overflow-hidden">

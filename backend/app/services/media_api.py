@@ -75,7 +75,10 @@ class MediaAPIService:
                         'cover_image': f"https://image.tmdb.org/t/p/w500{m['poster_path']}",
                         'release_year': m.get('release_date', '')[:4],
                         'creator': 'Director',
-                        'popularity': m.get('popularity', 0)
+                        'popularity': m.get('popularity', 0),
+                        'streaming_links': [
+                            {'provider': 'tmdb', 'url': f"https://www.themoviedb.org/movie/{m['id']}"}
+                        ]
                     })
                 return results
         except Exception as e:
@@ -97,6 +100,12 @@ class MediaAPIService:
                     info = b.get('volumeInfo', {})
                     if not info.get('imageLinks', {}).get('thumbnail'): continue
                     
+                    links = []
+                    if info.get('previewLink'):
+                        links.append({'provider': 'google_books_preview', 'url': info.get('previewLink')})
+                    if info.get('infoLink'):
+                        links.append({'provider': 'google_books_info', 'url': info.get('infoLink')})
+
                     results.append({
                         'external_id': f"gb_{b['id']}",
                         'title': info.get('title'),
@@ -106,7 +115,8 @@ class MediaAPIService:
                         'cover_image': info.get('imageLinks', {}).get('thumbnail'),
                         'release_year': info.get('publishedDate', '')[:4],
                         'creator': info.get('authors', ['Unknown Author'])[0],
-                        'popularity': 60
+                        'popularity': 60,
+                        'streaming_links': links
                     })
                 return results
         except Exception as e:
@@ -133,6 +143,10 @@ class MediaAPIService:
                 for t in tracks:
                     title = t.get('name')
                     artist = t.get('artist')
+                    links = []
+                    if t.get('url'):
+                        links.append({'provider': 'lastfm', 'url': t.get('url')})
+
                     results.append({
                         'external_id': t.get('mbid') or f"lastfm_{urllib.parse.quote_plus(artist+'_'+title)}",
                         'title': title,
@@ -142,7 +156,9 @@ class MediaAPIService:
                         'item_type': 'music',
                         'cover_image': t.get('image', [{}])[-1].get('#text') if t.get('image') else '',
                         'release_year': '',
-                        'popularity': 60
+                        'popularity': 60,
+                        'streaming_links': links,
+                        'description': ''
                     })
                 return results
         except Exception as e:
@@ -171,6 +187,14 @@ class MediaAPIService:
                     if artwork:
                         artwork = artwork.replace('100x100bb', '500x500bb')
 
+                    links = []
+                    if t.get('previewUrl'):
+                        links.append({'provider': 'itunes_preview', 'url': t.get('previewUrl')})
+                    if t.get('trackViewUrl'):
+                        links.append({'provider': 'itunes_track', 'url': t.get('trackViewUrl')})
+                    if t.get('artistViewUrl'):
+                        links.append({'provider': 'itunes_artist', 'url': t.get('artistViewUrl')})
+
                     results.append({
                         'external_id': external_id,
                         'title': title,
@@ -180,7 +204,9 @@ class MediaAPIService:
                         'item_type': 'music',
                         'cover_image': artwork,
                         'release_year': t.get('releaseDate', '')[:4] if t.get('releaseDate') else '',
-                        'popularity': 60
+                        'popularity': 60,
+                        'streaming_links': links,
+                        'description': t.get('longDescription') or t.get('shortDescription') or ''
                     })
                 return results
         except Exception as e:

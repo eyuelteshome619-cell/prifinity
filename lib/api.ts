@@ -213,6 +213,7 @@ export const itemsAPI = {
       details: ItemDetails;
       ethiopian_metadata: EthiopianMetadata | null;
       ratings: ItemRating[];
+      external_links?: ExternalLink[];
     }>(`/items/${id}`),
   
   search: (query: string, type?: string) =>
@@ -473,6 +474,8 @@ export interface Item {
   creator?: string;
   year?: number;
   created_at?: string;
+  // Optional list of external streaming/preview links
+  streaming_links?: ExternalLink[];
 }
 
 export interface ItemDetails {
@@ -495,6 +498,11 @@ export interface ItemDetails {
   duration_seconds?: number;
   ethiopian_genre?: string;
   spotify_id?: string;
+}
+
+export interface ExternalLink {
+  provider: string;
+  url: string;
 }
 
 export interface EthiopianMetadata {
@@ -627,6 +635,7 @@ export interface NewItemData {
   cover_image?: string;
   is_ethiopian?: boolean;
   popularity_score?: number;
+  streaming_links?: ExternalLink[];
   // Type-specific fields
   author?: string;
   director?: string;

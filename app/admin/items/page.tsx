@@ -19,9 +19,9 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Search, Plus, MoreHorizontal, Star, Edit, Trash2, Film, Music, BookOpen, Loader2, Globe, Activity
+  Search, Plus, MoreHorizontal, Star, Edit, Trash2, Film, Music, BookOpen, Loader2, Globe, Activity, ExternalLink, Copy
 } from "lucide-react";
-import { adminApi, itemsAPI, Item, NewItemData } from "@/lib/api";
+import { adminApi, discoveryAPI, itemsAPI, Item, NewItemData } from "@/lib/api";
 
 const ITEM_TYPES = ["movie", "music", "book"] as const;
 type ItemType = typeof ITEM_TYPES[number];
@@ -162,8 +162,26 @@ export default function AdminItemsPage() {
   const handleImportAction = async (item: any) => {
     setItemImporting(item.external_id);
     try {
+      // Attempt to enrich missing metadata (description / cover image) before importing
+      let payloadItem = { ...item };
+      if ((!item.description || !item.cover_image) && item.title) {
+        try {
+          const res = await discoveryAPI.searchExternalPublic(importType, item.title);
+          const match = res.results && res.results[0];
+          if (match) {
+            payloadItem = {
+              ...payloadItem,
+              description: payloadItem.description || match.description || match.overview || "",
+              cover_image: payloadItem.cover_image || match.cover_image || match.image || "",
+            };
+          }
+        } catch (e) {
+          console.error("Metadata enrichment failed:", e);
+        }
+      }
+
       // Send a flag to mark this imported item as Ethiopian when requested
-      const payload = { ...item, is_ethiopian: importIsEthiopian };
+      const payload = { ...payloadItem, is_ethiopian: importIsEthiopian };
       await adminApi.importExternalItem(payload as any);
       await fetchItems();
       setImportSearchOpen(false);
@@ -174,6 +192,34 @@ export default function AdminItemsPage() {
       setItemImporting(null);
     }
   };
+
+  const displayProvider = (p: string) => {
+    if (!p) return '';
+    return p.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
+  // Debounced autosuggest for import search
+  useEffect(() => {
+    const q = importQuery.trim();
+    if (!q || q.length < 2) {
+      setImportResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setImportLoading(true);
+      try {
+        const response = await adminApi.searchExternal(importType, q);
+        setImportResults(response.results || []);
+      } catch (err) {
+        console.error('Import Search Error:', err);
+      } finally {
+        setImportLoading(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [importQuery, importType]);
 
   const handleDelete = async (item: Item) => {
     if (!confirm(`Delete "${item.title}"? This cannot be undone.`)) return;
@@ -549,6 +595,38 @@ export default function AdminItemsPage() {
                   <p className="text-xs text-muted-foreground line-clamp-2 mt-2">
                     {item.description}
                   </p>
+                  {item.streaming_links && item.streaming_links.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2 items-center">
+                      {item.streaming_links.map((l: any, idx: number) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <a
+                            href={l.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs px-2 py-1 rounded bg-primary/10 text-primary flex items-center gap-2"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            {displayProvider(l.provider)}
+                          </a>
+                          <button
+                            className="text-xs px-2 py-1 rounded bg-white/5 hover:bg-white/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              try {
+                                if (navigator && (navigator as any).clipboard && l.url) {
+                                  (navigator as any).clipboard.writeText(l.url);
+                                  alert('Link copied to clipboard');
+                                }
+                              } catch (err) {}
+                            }}
+                            title="Copy link"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {item.popularity > 0 && (
                     <div className="flex items-center gap-1 mt-2">
                       <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
