@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Search, Plus, MoreHorizontal, Star, Edit, Trash2, Film, Music, BookOpen, Loader2, Globe, Activity, ExternalLink, Copy
+  Search, Plus, MoreHorizontal, Star, Edit, Trash2, Film, Music, BookOpen, Loader2, Globe, Activity, ExternalLink, Copy, X
 } from "lucide-react";
 import { adminApi, discoveryAPI, itemsAPI, Item, NewItemData } from "@/lib/api";
 
@@ -67,6 +67,7 @@ export default function AdminItemsPage() {
   const [importLoading, setImportLoading] = useState(false);
   const [itemImporting, setItemImporting] = useState<string | null>(null);
   const [importIsEthiopian, setImportIsEthiopian] = useState(false);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => { fetchItems(); }, []);
 
@@ -216,10 +217,18 @@ export default function AdminItemsPage() {
       } finally {
         setImportLoading(false);
       }
-    }, 450);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [importQuery, importType]);
+
+  // Auto-focus search input when import dialog opens
+  useEffect(() => {
+    if (importSearchOpen) {
+      // Delay to ensure dialog is mounted
+      setTimeout(() => importInputRef.current?.focus(), 50);
+    }
+  }, [importSearchOpen]);
 
   const handleDelete = async (item: Item) => {
     if (!confirm(`Delete "${item.title}"? This cannot be undone.`)) return;
@@ -533,13 +542,26 @@ export default function AdminItemsPage() {
                 <SelectItem value="book">Book</SelectItem>
               </SelectContent>
             </Select>
-            <Input
-              placeholder={`Search ${importType}s...`}
-              value={importQuery}
-              onChange={(e) => setImportQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleImportSearch()}
-              className="flex-1"
-            />
+            <div className="relative flex-1">
+              <Input
+                placeholder={`Search ${importType}s (min 2 chars)`}
+                value={importQuery}
+                onChange={(e) => setImportQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleImportSearch()}
+                className="flex-1 pr-10"
+                ref={importInputRef}
+                aria-label={`Search ${importType}s`}
+              />
+              {importQuery && (
+                <button
+                  onClick={() => setImportQuery("")}
+                  aria-label="Clear search"
+                  className="absolute right-12 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
             <Button onClick={handleImportSearch} disabled={importLoading}>
               {importLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             </Button>

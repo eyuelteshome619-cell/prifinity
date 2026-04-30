@@ -1,7 +1,7 @@
 """
 Admin Routes - Content Management, User Management
 """
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, current_app
 from app.utils.database import execute_query
 from app.utils.auth import admin_required
 from app.services.media_api import MediaAPIService
@@ -418,6 +418,18 @@ def import_external():
         pass
     
     # 1. Insert into base items table (include is_ethiopian if provided)
+    # Apply an optional boost to popularity for Ethiopian imports so they surface at the top
+    try:
+        base_popularity = int(data.get('popularity') or 0)
+    except Exception:
+        base_popularity = 0
+
+    if bool(data.get('is_ethiopian', False)):
+        boost = int(current_app.config.get('ETHIOPIAN_IMPORT_POPULARITY_BOOST', 1000))
+        popularity_score = max(base_popularity, boost)
+    else:
+        popularity_score = base_popularity
+
     item_id = execute_query(
         """INSERT INTO items (title, description, genre, item_type, cover_image, popularity_score, external_id, is_ethiopian)
            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
@@ -427,7 +439,7 @@ def import_external():
             data.get('genre', 'Other'),
             item_type,
             data.get('cover_image', ''),
-            data.get('popularity', 0),
+            popularity_score,
             data.get('external_id'),
             bool(data.get('is_ethiopian', False))
         ),
