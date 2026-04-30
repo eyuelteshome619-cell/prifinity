@@ -9,6 +9,30 @@ import json
 items_bp = Blueprint('items', __name__)
 
 
+def _attach_streaming_links(items):
+    """Attach streaming_links list to each item dict by querying external_links table."""
+    if not items:
+        return items
+    try:
+        ids = [it['id'] for it in items if it.get('id')]
+        if not ids:
+            return items
+        # Build placeholders and params
+        placeholders = ','.join(['%s'] * len(ids))
+        query = f"SELECT item_id, provider, url FROM external_links WHERE item_id IN ({placeholders})"
+        rows = execute_query(query, tuple(ids))
+        mapping = {}
+        for r in rows:
+            mapping.setdefault(r['item_id'], []).append({'provider': r.get('provider'), 'url': r.get('url')})
+        for it in items:
+            it['streaming_links'] = mapping.get(it.get('id'), [])
+    except Exception:
+        # If table doesn't exist or query fails, silently continue without links
+        for it in items:
+            it['streaming_links'] = []
+    return items
+
+
 @items_bp.route('', methods=['GET'])
 def get_items():
     """Get all items with filtering and pagination"""
@@ -66,6 +90,8 @@ def get_items():
     query += f" LIMIT {per_page} OFFSET {offset}"
     
     items = execute_query(query, tuple(params))
+    # Attach streaming links (external links) to each item for easy frontend access
+    items = _attach_streaming_links(items)
     
     # Get total count
     count_query = """
@@ -350,6 +376,8 @@ def get_popular():
     query += f" ORDER BY i.popularity_score DESC, i.avg_rating DESC LIMIT {limit}"
     
     items = execute_query(query, tuple(params))
+    # Attach streaming links for returned items
+    items = _attach_streaming_links(items)
     
     return jsonify({'items': items}), 200
 
@@ -383,6 +411,8 @@ def get_ethiopian_content():
     query += f" ORDER BY i.popularity_score DESC LIMIT {limit}"
     
     items = execute_query(query, tuple(params))
+    # Attach streaming links for Ethiopian content
+    items = _attach_streaming_links(items)
     
     return jsonify({'items': items}), 200
 
