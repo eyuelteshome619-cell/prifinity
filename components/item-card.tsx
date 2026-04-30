@@ -257,8 +257,9 @@ export function ItemCard({
                   <Play className="h-4 w-4" />
                 </Button>
               ) : null}
-              {/* Streaming links (other providers) */}
-              {streamingLinks.length > 0 && (
+
+              {/* Streaming links (other providers) or fallback link so every item has a link */}
+              {streamingLinks.length > 0 ? (
                 <div className="flex items-center gap-1">
                   {streamingLinks.slice(0, 3).map((l, idx) => (
                     <div key={idx} className="flex items-center gap-1">
@@ -285,7 +286,6 @@ export function ItemCard({
                           try {
                             if (navigator && (navigator as any).clipboard && l.url) {
                               (navigator as any).clipboard.writeText(l.url);
-                              // small inline toast
                               try { window.dispatchEvent(new CustomEvent('prefinity:copied', { detail: l.url })); } catch {}
                             }
                           } catch (err) {}
@@ -300,6 +300,23 @@ export function ItemCard({
                     <Badge className="text-xs">+{streamingLinks.length - 3}</Badge>
                   )}
                 </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    try {
+                      const url = item && item.id ? `/item/${item.id}` : '/';
+                      window.open(url, '_blank', 'noopener');
+                    } catch {}
+                  }}
+                  title="Open item details"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
               )}
             </div>
           </div>
