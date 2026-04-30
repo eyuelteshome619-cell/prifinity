@@ -216,13 +216,15 @@ export default function ItemDetailPage({ params }: PageProps) {
         {/* Immersive Background Blur */}
         <div className="absolute top-0 left-0 w-full h-[500px] overflow-hidden -z-10 opacity-30">
           {item.cover_image ? (
-            <img 
-              src={item.cover_image} 
-              alt="" 
-              className="w-full h-full object-cover blur-[100px] scale-110"
+            <img
+              src={item.cover_image}
+              alt=""
+              loading="eager"
+              decoding="async"
+              className="w-full h-full object-cover blur-[28px] scale-110"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-primary/20 via-background to-amber-500/20 blur-[100px]" />
+            <div className="w-full h-full bg-gradient-to-br from-primary/20 via-background to-amber-500/20 blur-[20px]" />
           )}
           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background" />
         </div>
@@ -245,6 +247,8 @@ export default function ItemDetailPage({ params }: PageProps) {
                   <img
                     src={item.cover_image}
                     alt={item.title}
+                    loading="lazy"
+                    decoding="async"
                     className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
                   />
                 ) : (

@@ -4,6 +4,9 @@ Recommendations Routes - AI-Powered Recommendation System
 from flask import Blueprint, request, jsonify, g, current_app
 from app.utils.database import execute_query
 from app.utils.auth import token_required, credits_required
+from app.utils.cache import cache_get, cache_set
+
+
 def get_recommendation_engine():
     """Try to import and construct the RecommendationEngine.
     Returns None if the ML dependencies are not available so the app can
@@ -36,17 +39,29 @@ def get_recommendations():
     limit = min(int(request.args.get('limit', 20)), 50)
     algorithm = request.args.get('algorithm', 'hybrid')  # collaborative, content, hybrid
     
-    # Initialize recommendation engine (may be None if ML deps missing)
-    engine = get_recommendation_engine()
-
-    # Get user preferences
+    # Get user preferences early (used for caching key and for boost)
     preferences = execute_query(
         "SELECT * FROM preferences WHERE user_id = %s",
         (user_id,),
         fetch_one=True
     )
-    
+
     ethiopian_boost = preferences.get('ethiopian_content_preference', False) if preferences else False
+
+    # Simple per-worker cache to avoid recomputing heavy ML recommendations repeatedly.
+    cache_key = f"recs:{user_id}:{item_type or 'all'}:{algorithm}:{limit}:{int(bool(ethiopian_boost))}"
+    try:
+        cached = cache_get(cache_key)
+        if cached:
+            resp = dict(cached)
+            resp['cached'] = True
+            return jsonify(resp), 200
+    except Exception:
+        # Don't fail if cache is misbehaving; continue normally
+        pass
+
+    # Initialize recommendation engine (may be None if ML deps missing)
+    engine = get_recommendation_engine()
     
     # Helper to run heavy engine calls with a short timeout to avoid blocking the web worker
     def run_with_timeout(fn, timeout=8):
@@ -174,6 +189,13 @@ def get_recommendations():
     }
     if 'fallback_used' in locals() and fallback_used:
         response['fallback'] = True
+
+    # Cache short-term to speed up repeat requests (TTL configurable)
+    try:
+        ttl = int(current_app.config.get('RECOMMENDATION_CACHE_TTL', 60))
+        cache_set(cache_key, response, ttl=ttl)
+    except Exception:
+        pass
 
     return jsonify(response), 200
 
