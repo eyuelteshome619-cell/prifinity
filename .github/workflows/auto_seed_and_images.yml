@@ -1,0 +1,62 @@
+name: Auto Seed & Fetch Images
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  seed_and_fetch:
+    name: Seed and fetch images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for site to be ready..."
+          sleep 15
+
+      - name: Call seed endpoint (token or admin jwt)
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}
+          SEED_TOKEN: ${{ secrets.SEED_TOKEN }}
+          ADMIN_JWT: ${{ secrets.ADMIN_JWT }}
+        run: |
+          set -e
+          if [ -n "$SEED_TOKEN" ]; then
+            echo "Calling seed with SEED_TOKEN"
+            curl -s -X POST "$SITE_URL/api/admin/seed" -H "X-SEED-TOKEN: $SEED_TOKEN" -o seed.json || true
+            echo "Seed response:"
+            cat seed.json || true
+          elif [ -n "$ADMIN_JWT" ]; then
+            echo "Calling seed with ADMIN_JWT"
+            curl -s -X POST "$SITE_URL/api/admin/seed" -H "Authorization: Bearer $ADMIN_JWT" -o seed.json || true
+            echo "Seed response:"
+            cat seed.json || true
+          else
+            echo "No SEED_TOKEN or ADMIN_JWT set; skipping seed call"
+          fi
+
+      - name: Call fetch-missing-images endpoint
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}
+          SEED_TOKEN: ${{ secrets.SEED_TOKEN }}
+          ADMIN_JWT: ${{ secrets.ADMIN_JWT }}
+        run: |
+          set -e
+          if [ -n "$SEED_TOKEN" ]; then
+            echo "Calling fetch-missing-images with SEED_TOKEN"
+            curl -s -X POST "$SITE_URL/api/admin/fetch-missing-images" -H "X-SEED-TOKEN: $SEED_TOKEN" -o images.json || true
+            echo "Images response:"
+            cat images.json || true
+          elif [ -n "$ADMIN_JWT" ]; then
+            echo "Calling fetch-missing-images with ADMIN_JWT"
+            curl -s -X POST "$SITE_URL/api/admin/fetch-missing-images" -H "Authorization: Bearer $ADMIN_JWT" -o images.json || true
+            echo "Images response:"
+            cat images.json || true
+          else
+            echo "No SEED_TOKEN or ADMIN_JWT set; skipping image fetch call"
+          fi
