@@ -45,6 +45,12 @@ class Config:
     # Database pool size (increase if you see 'pool exhausted' errors)
     DB_POOL_SIZE = int(os.environ.get('DB_POOL_SIZE', 10))
 
+    # Remote seeding configuration
+    # Set `SEED_TOKEN` in environment to enable token-based remote seeding
+    SEED_TOKEN = os.environ.get('SEED_TOKEN')
+    # Toggle remote seeding (only allow token-based seeding when True)
+    ENABLE_REMOTE_SEED = os.environ.get('ENABLE_REMOTE_SEED', 'false').lower() == 'true'
+
 
 class DevelopmentConfig(Config):
     """Development configuration"""

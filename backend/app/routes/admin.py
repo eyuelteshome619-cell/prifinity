@@ -3,9 +3,10 @@ Admin Routes - Content Management, User Management
 """
 from flask import Blueprint, request, jsonify, g, current_app
 from app.utils.database import execute_query
-from app.utils.auth import admin_required
+from app.utils.auth import admin_required, get_current_user
 from app.services.media_api import MediaAPIService
 import json
+from app.utils.seed import run_seed_items
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -397,6 +398,46 @@ def search_items_admin():
 
     if not query_text:
         return jsonify({'results': [], 'query': query_text, 'count': 0}), 200
+
+
+@admin_bp.route('/seed', methods=['POST'])
+def trigger_seed():
+    """Trigger the seed process.
+
+    Authorization options:
+    - Provide a valid `X-SEED-TOKEN` header that matches `SEED_TOKEN` and ensure
+      `ENABLE_REMOTE_SEED` is enabled in config.
+    - Or authenticate as an admin user with a normal Bearer JWT in `Authorization`.
+    """
+    # Token-based path (preferred for CI/CD or remote triggering)
+    token = request.headers.get('X-SEED-TOKEN') or request.args.get('seed_token')
+    seed_token = current_app.config.get('SEED_TOKEN')
+    enable_remote = current_app.config.get('ENABLE_REMOTE_SEED', False)
+
+    authorized = False
+    if token and seed_token and enable_remote and token == seed_token:
+        authorized = True
+
+    # Fallback to JWT admin authentication
+    if not authorized:
+        user = get_current_user()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        if user.get('role') != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
+        # mark current user in request context
+        g.current_user = user
+        authorized = True
+
+    if not authorized:
+        return jsonify({'error': 'Seeding disabled or invalid token'}), 403
+
+    try:
+        inserted = run_seed_items()
+        return jsonify({'message': 'Seed completed', 'inserted': inserted}), 200
+    except Exception as e:
+        current_app.logger.error(f"Seed failed: {e}")
+        return jsonify({'error': 'Seed failed', 'details': str(e)}), 500
 
     # Try full-text search first (MySQL MATCH). If it fails or returns no rows, fall back to LIKE.
     try:
