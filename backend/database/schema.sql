@@ -31,7 +31,9 @@ CREATE TABLE users (
 CREATE TABLE items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
+    title_am VARCHAR(500),
     description TEXT,
+    description_am TEXT,
     genre VARCHAR(100),
     item_type ENUM('book', 'movie', 'music') NOT NULL,
     cover_image VARCHAR(500),
@@ -45,7 +47,7 @@ CREATE TABLE items (
     INDEX idx_item_type (item_type),
     INDEX idx_genre (genre),
     INDEX idx_is_ethiopian (is_ethiopian),
-    FULLTEXT INDEX idx_search (title, description, genre)
+    FULLTEXT INDEX idx_search (title, title_am, description, description_am, genre)
 );
 
 -- ================================================

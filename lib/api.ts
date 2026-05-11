@@ -471,7 +471,9 @@ export interface UserStats {
 export interface Item {
   id: number;
   title: string;
+  title_am?: string;
   description: string;
+  description_am?: string;
   genre: string;
   item_type: 'book' | 'movie' | 'music';
   cover_image: string;

@@ -252,7 +252,7 @@ def search_items():
     # Full-text search
     search_query = """
         SELECT i.*, 
-               MATCH(i.title, i.description, i.genre) AGAINST(%s IN NATURAL LANGUAGE MODE) as relevance,
+               MATCH(i.title, i.title_am, i.description, i.description_am, i.genre) AGAINST(%s IN NATURAL LANGUAGE MODE) as relevance,
                CASE 
                    WHEN i.item_type = 'book' THEN b.author
                    WHEN i.item_type = 'movie' THEN m.director
@@ -262,7 +262,7 @@ def search_items():
         LEFT JOIN books b ON i.id = b.item_id AND i.item_type = 'book'
         LEFT JOIN movies m ON i.id = m.item_id AND i.item_type = 'movie'
         LEFT JOIN music mu ON i.id = mu.item_id AND i.item_type = 'music'
-        WHERE MATCH(i.title, i.description, i.genre) AGAINST(%s IN NATURAL LANGUAGE MODE)
+        WHERE MATCH(i.title, i.title_am, i.description, i.description_am, i.genre) AGAINST(%s IN NATURAL LANGUAGE MODE)
     """
     params = [query_text, query_text]
     
@@ -287,9 +287,9 @@ def search_items():
             LEFT JOIN books b ON i.id = b.item_id AND i.item_type = 'book'
             LEFT JOIN movies m ON i.id = m.item_id AND i.item_type = 'movie'
             LEFT JOIN music mu ON i.id = mu.item_id AND i.item_type = 'music'
-            WHERE i.title LIKE %s OR i.description LIKE %s OR i.genre LIKE %s
+            WHERE i.title LIKE %s OR i.title_am LIKE %s OR i.description LIKE %s OR i.description_am LIKE %s OR i.genre LIKE %s
         """
-        like_params = [f'%{query_text}%', f'%{query_text}%', f'%{query_text}%']
+        like_params = [f'%{query_text}%', f'%{query_text}%', f'%{query_text}%', f'%{query_text}%', f'%{query_text}%']
         
         if item_type:
             like_query += " AND i.item_type = %s"

@@ -32,8 +32,8 @@ import {
   Clock,
   User,
   Globe,
-  Star,
-  ExternalLink,
+  Star as StarIcon,
+  ExternalLink as ExternalLinkIcon,
   Loader2,
   ArrowLeft,
   Send
@@ -54,7 +54,7 @@ const typeIcons = {
 export default function ItemDetailPage({ params }: PageProps) {
   const { id } = use(params);
   const { isAuthenticated, refreshUser } = useAuth();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [item, setItem] = useState<Item | null>(null);
   const [details, setDetails] = useState<ItemDetails | null>(null);
   const [ethiopianMetadata, setEthiopianMetadata] = useState<EthiopianMetadata | null>(null);
@@ -259,9 +259,9 @@ export default function ItemDetailPage({ params }: PageProps) {
                 
                 {/* Ethiopian Badge */}
                 {item.is_ethiopian && (
-                  <Badge className="absolute top-6 left-6 bg-amber-500/90 text-white border-0 backdrop-blur-md px-3 py-1 text-xs">
-                    <Globe className="mr-1.5 h-3.5 w-3.5" />
-                    {t('nav.ethiopian')}
+                  <Badge className="absolute top-6 left-6 bg-gradient-to-r from-emerald-500 via-yellow-400 to-red-500 text-white border-0 backdrop-blur-md px-4 py-1.5 text-[10px] font-black shadow-2xl animate-pulse">
+                    <Globe className="mr-2 h-4 w-4" />
+                    ETHIOPIAN HERITAGE
                   </Badge>
                 )}
               </div>
@@ -295,7 +295,7 @@ export default function ItemDetailPage({ params }: PageProps) {
                   </Badge>
                 )}
                 <div className="flex items-center gap-1.5 ml-auto">
-                  <Star className="h-5 w-5 fill-amber-400 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" />
+                  <StarIcon className="h-5 w-5 fill-amber-400 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" />
                   <span className="text-2xl font-black">{item.avg_rating?.toFixed(1) || 'N/A'}</span>
                   <span className="text-sm text-muted-foreground italic mt-1">
                     {t('item_page.ratings_count', { count: item.rating_count || 0 })}
@@ -304,7 +304,7 @@ export default function ItemDetailPage({ params }: PageProps) {
               </div>
               
               <h1 className="text-5xl md:text-7xl font-black mb-4 tracking-tighter leading-none italic">
-                {item.title}
+                {lang === 'am' && item.title_am ? item.title_am : item.title}
               </h1>
               
               {ethiopianMetadata?.amharic_title && (
@@ -314,13 +314,50 @@ export default function ItemDetailPage({ params }: PageProps) {
               )}
             </div>
 
-            {/* Description */}
-            {item.description && (
+            {/* Detailed Description & Analysis */}
+            <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-700 delay-150">
               <div>
-                <h2 className="text-lg font-semibold mb-2">{t('item_page.description')}</h2>
-                <p className="text-muted-foreground">{item.description}</p>
+                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-primary" />
+                  {t('item_page.description')}
+                </h2>
+                <div className="prose prose-invert max-w-none">
+                  <p className="text-lg leading-relaxed text-muted-foreground whitespace-pre-wrap italic">
+                    {lang === 'am' && item.description_am ? item.description_am : item.description}
+                  </p>
+                </div>
               </div>
-            )}
+
+              {/* Video Trailer / Preview Section */}
+              {externalLinks.some(l => l.url.includes('youtube.com') || l.url.includes('youtu.be')) && (
+                <div className="space-y-4">
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <Film className="h-5 w-5 text-rose-500" />
+                    {item.item_type === 'movie' ? 'Official Trailer' : 'Video Preview'}
+                  </h2>
+                  <div className="aspect-video w-full overflow-hidden rounded-[24px] border border-white/10 bg-black/40 shadow-2xl">
+                    {(() => {
+                      const youtubeLink = externalLinks.find(l => l.url.includes('youtube.com') || l.url.includes('youtu.be'));
+                      if (!youtubeLink) return null;
+                      const videoId = youtubeLink.url.includes('v=') 
+                        ? youtubeLink.url.split('v=')[1].split('&')[0]
+                        : youtubeLink.url.split('/').pop();
+                      return (
+                        <iframe
+                          width="100%"
+                          height="100%"
+                          src={`https://www.youtube.com/embed/${videoId}`}
+                          title="YouTube video player"
+                          frameBorder="0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                        ></iframe>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Last.fm Link (stored in legacy `spotify_id` field) */}
             {lastfmUrl && (
@@ -352,7 +389,7 @@ export default function ItemDetailPage({ params }: PageProps) {
                 <Card className="overflow-hidden border-sky-500/20 shadow-sky-500/5">
                   <CardHeader className="bg-sky-500/5 pb-4">
                     <CardTitle className="text-sm font-semibold flex items-center text-sky-600">
-                      <ExternalLink className="mr-2 h-4 w-4" />
+                      <ExternalLinkIcon className="mr-2 h-4 w-4" />
                       {t('item_page.streaming_links')}
                     </CardTitle>
                   </CardHeader>
@@ -366,7 +403,7 @@ export default function ItemDetailPage({ params }: PageProps) {
                             rel="noopener noreferrer"
                             className="flex items-center gap-2 text-primary underline"
                           >
-                            <ExternalLink className="h-4 w-4" />
+                            <ExternalLinkIcon className="h-4 w-4" />
                             <span className="font-medium">{displayProvider(l.provider)}</span>
                           </a>
                           <span className="text-xs text-muted-foreground ml-2 truncate max-w-[50%]">{l.url}</span>
@@ -451,34 +488,40 @@ export default function ItemDetailPage({ params }: PageProps) {
               </CardContent>
             </Card>
 
-            {/* Ethiopian Metadata */}
+            {/* Ethiopian Metadata / Cultural Context */}
             {ethiopianMetadata && (
-              <Card className="border-amber-200 bg-amber-50/50">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-amber-500" />
+              <Card className="border-emerald-500/20 bg-emerald-500/5 backdrop-blur-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500 delay-300">
+                <CardHeader className="bg-emerald-500/10 border-b border-emerald-500/10">
+                  <CardTitle className="text-xl flex items-center gap-3 text-emerald-400">
+                    <Globe className="h-6 w-6" />
                     {t('item_page.eth_heritage')}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="p-6 space-y-6">
                   {ethiopianMetadata.cultural_significance && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t('item_page.cultural_sig')}</p>
-                      <p className="text-sm">{ethiopianMetadata.cultural_significance}</p>
+                    <div className="space-y-2">
+                      <p className="text-xs font-black uppercase text-emerald-500/60 tracking-widest leading-none mb-3">
+                        {t('item_page.cultural_sig')}
+                      </p>
+                      <p className="text-base leading-relaxed text-emerald-100/80">
+                        {ethiopianMetadata.cultural_significance}
+                      </p>
                     </div>
                   )}
-                  {ethiopianMetadata.region && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t('item_page.region')}</p>
-                      <p className="text-sm">{ethiopianMetadata.region}</p>
-                    </div>
-                  )}
-                  {ethiopianMetadata.traditional_genre && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t('item_page.trad_genre')}</p>
-                      <p className="text-sm">{ethiopianMetadata.traditional_genre}</p>
-                    </div>
-                  )}
+                  <div className="grid grid-cols-2 gap-6 pt-4 border-t border-emerald-500/10">
+                    {ethiopianMetadata.region && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-emerald-500/60 tracking-widest mb-1">{t('item_page.region')}</p>
+                        <p className="text-sm font-bold text-white">{ethiopianMetadata.region}</p>
+                      </div>
+                    )}
+                    {ethiopianMetadata.traditional_genre && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-emerald-500/60 tracking-widest mb-1">{t('item_page.trad_genre')}</p>
+                        <p className="text-sm font-bold text-white">{ethiopianMetadata.traditional_genre}</p>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             )}
