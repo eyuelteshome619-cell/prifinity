@@ -39,7 +39,7 @@ export function ItemCard({
   onRemove,
   isExternal
 }: ItemCardProps) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { isAuthenticated, refreshUser } = useAuth();
   const [isFavorite, setIsFavorite] = useState(initialInWishlist || isWishlistItem);
   const [isPending, setIsPending] = useState(false);
