@@ -18,8 +18,8 @@ pandas>=2.1.3
 python-dotenv==1.0.0
 
 # Production Server (optional)
-# Production Server (optional)
-# gunicorn is not supported on Windows natively
+# Production Server (required for Heroku/Linux)
+gunicorn==21.2.0
 
 # External APIs
 requests==2.31.0
