@@ -247,8 +247,12 @@ def refresh_token():
 
 
 @auth_bp.route('/reset-password', methods=['POST'])
+@token_required
 def reset_password():
-    """Reset user password directly for local dev"""
+    """Reset user password (admin-only for maintenance)"""
+    from flask import g
+    if g.current_user.get('role') != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
     data = request.get_json()
     email = data.get('email', '').strip().lower()
     new_password = data.get('new_password', '')

@@ -60,7 +60,8 @@ class Database:
                 ('TMDB_API_KEY', '', 'api_keys', 'The Movie Database API Key (v3)'),
                 ('SPOTIFY_CLIENT_ID', '', 'api_keys', 'Spotify Developer Client ID'),
                 ('SPOTIFY_CLIENT_SECRET', '', 'api_keys', 'Spotify Developer Client Secret'),
-                ('GOOGLE_BOOKS_API_KEY', '', 'api_keys', 'Google Books API Key')
+                ('GOOGLE_BOOKS_API_KEY', '', 'api_keys', 'Google Books API Key'),
+                ('LASTFM_API_KEY', '', 'api_keys', 'Last.fm API Key for music search')
                 """)
                 # Ensure items table has external_id for TMDB sync
                 try:
@@ -69,7 +70,30 @@ class Database:
                 except Exception as ex_col:
                     # Column likely already exists
                     pass
-                    
+
+                # Ensure verification_codes table exists for forgot-password flow
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS verification_codes (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    email VARCHAR(100) NOT NULL,
+                    code VARCHAR(6) NOT NULL,
+                    expires_at TIMESTAMP NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_email_code (email, code)
+                );
+                """)
+
+                # Ensure external_links table exists for streaming links
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS external_links (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    item_id INT NOT NULL,
+                    provider VARCHAR(128),
+                    url VARCHAR(512),
+                    FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+                );
+                """)
+
                 conn.commit()
                 cursor.close()
                 conn.close()

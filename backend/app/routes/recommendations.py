@@ -113,11 +113,11 @@ def get_recommendations():
             if recommendations is None:
                 if algorithm == 'collaborative':
                     recommendations = run_with_timeout(lambda: engine.collaborative_filtering(user_id, item_type, limit))
-            elif algorithm == 'content':
+                elif algorithm == 'content':
                     recommendations = run_with_timeout(lambda: engine.content_based_filtering(user_id, item_type, limit))
-            elif algorithm == 'cross_domain':
+                elif algorithm == 'cross_domain':
                     recommendations = run_with_timeout(lambda: engine.cross_domain_recommendations(user_id, limit))
-            else:  # hybrid (default)
+                else:  # hybrid (default)
                     recommendations = run_with_timeout(lambda: engine.hybrid_recommendations(user_id, item_type, limit, ethiopian_boost))
     except Exception as e:
         print(f"RECOMMENDATION ENGINE ERROR or TIMEOUT: {e}")
@@ -399,28 +399,4 @@ def recommendation_feedback():
     return jsonify({'message': 'Feedback recorded successfully'}), 200
 
 
-def deduct_credits(user_id, amount, transaction_type, description):
-    """Deduct credits from user account"""
-    if amount <= 0:
-        return
-    
-    user = execute_query(
-        "SELECT credits FROM users WHERE id = %s",
-        (user_id,),
-        fetch_one=True
-    )
-    
-    new_balance = user['credits'] - amount
-    
-    execute_query(
-        "UPDATE users SET credits = %s WHERE id = %s",
-        (new_balance, user_id),
-        fetch_all=False
-    )
-    
-    execute_query(
-        """INSERT INTO credit_transactions (user_id, amount, transaction_type, description, balance_after)
-           VALUES (%s, %s, %s, %s, %s)""",
-        (user_id, -amount, transaction_type, description, new_balance),
-        fetch_all=False
-    )
+from app.utils.credits import deduct_credits

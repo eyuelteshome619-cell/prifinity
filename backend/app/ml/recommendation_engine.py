@@ -106,10 +106,12 @@ class RecommendationEngine:
             return self.cold_start_recommendations(item_type, limit)
         
         items_query = "SELECT id, title, genre, description, item_type, is_ethiopian, avg_rating FROM items"
+        items_params = []
         if item_type:
-            items_query += f" WHERE item_type = '{item_type}'"
+            items_query += " WHERE item_type = %s"
+            items_params.append(item_type)
         
-        all_items = execute_query(items_query)
+        all_items = execute_query(items_query, tuple(items_params) if items_params else None)
         if len(all_items) < 2:
             return self.cold_start_recommendations(item_type, limit)
         
@@ -121,6 +123,7 @@ class RecommendationEngine:
 
             all_features = [create_features(item) for item in all_items]
             # Lazy import sklearn to reduce cold-start overhead
+            import numpy as np
             from sklearn.feature_extraction.text import TfidfVectorizer
             from sklearn.metrics.pairwise import cosine_similarity
 

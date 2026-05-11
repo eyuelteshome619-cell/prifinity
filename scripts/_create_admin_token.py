@@ -6,7 +6,7 @@ from urllib import request, error
 
 API_BASE = os.environ.get('API_BASE', 'http://127.0.0.1:5000/api')
 email = 'admin@example.com'
-new_password = 'PrefinityAdmin!2026'
+new_password = '12121212'
 
 headers = {'Content-Type': 'application/json'}
 

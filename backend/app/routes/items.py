@@ -417,31 +417,4 @@ def get_ethiopian_content():
     return jsonify({'items': items}), 200
 
 
-def deduct_credits(user_id, amount, transaction_type, description):
-    """Deduct credits from user account"""
-    if amount <= 0:
-        return
-    
-    # Get current credits
-    user = execute_query(
-        "SELECT credits FROM users WHERE id = %s",
-        (user_id,),
-        fetch_one=True
-    )
-    
-    new_balance = user['credits'] - amount
-    
-    # Update credits
-    execute_query(
-        "UPDATE users SET credits = %s WHERE id = %s",
-        (new_balance, user_id),
-        fetch_all=False
-    )
-    
-    # Record transaction
-    execute_query(
-        """INSERT INTO credit_transactions (user_id, amount, transaction_type, description, balance_after)
-           VALUES (%s, %s, %s, %s, %s)""",
-        (user_id, -amount, transaction_type, description, new_balance),
-        fetch_all=False
-    )
+from app.utils.credits import deduct_credits

@@ -39,6 +39,7 @@ CREATE TABLE items (
     popularity_score FLOAT DEFAULT 0,
     avg_rating FLOAT DEFAULT 0,
     rating_count INT DEFAULT 0,
+    external_id VARCHAR(255) UNIQUE DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_item_type (item_type),
@@ -219,6 +220,18 @@ CREATE TABLE verification_codes (
     expires_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_email_code (email, code)
+);
+
+-- ================================================
+-- External Links Table (Streaming/Preview links)
+-- ================================================
+CREATE TABLE external_links (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    item_id INT NOT NULL,
+    provider VARCHAR(128),
+    url VARCHAR(512),
+    FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+    INDEX idx_item_links (item_id)
 );
 
 -- ================================================

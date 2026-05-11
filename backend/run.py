@@ -21,21 +21,21 @@ if __name__ == '__main__':
     debug = config_name == 'development'
     
     print(f"""
-    ╔══════════════════════════════════════════════════════════════╗
-    ║     Personal Movie, Music, and Book Recommendation System    ║
-    ║                      API Server Running                       ║
-    ╠══════════════════════════════════════════════════════════════╣
-    ║  Environment: {config_name:<44} ║
-    ║  Port: {port:<50} ║
-    ║  Debug: {str(debug):<49} ║
-    ╠══════════════════════════════════════════════════════════════╣
-    ║  API Endpoints:                                               ║
-    ║  - POST /api/auth/register    - Register new user            ║
-    ║  - POST /api/auth/login       - Login user                   ║
-    ║  - GET  /api/items            - Browse content               ║
-    ║  - GET  /api/recommendations  - Get AI recommendations       ║
-    ║  - GET  /api/credits/balance  - Check credit balance         ║
-    ╚══════════════════════════════════════════════════════════════╝
+    ================================================================
+    |     Personal Movie, Music, and Book Recommendation System    |
+    |                      API Server Running                       |
+    ================================================================
+    |  Environment: {config_name:<44} |
+    |  Port: {port:<50} |
+    |  Debug: {str(debug):<49} |
+    ================================================================
+    |  API Endpoints:                                               |
+    |  - POST /api/auth/register    - Register new user            |
+    |  - POST /api/auth/login       - Login user                   |
+    |  - GET  /api/items            - Browse content               |
+    |  - GET  /api/recommendations  - Get AI recommendations       |
+    |  - GET  /api/credits/balance  - Check credit balance         |
+    ================================================================
     """)
     
     app.run(host='0.0.0.0', port=port, debug=debug)
