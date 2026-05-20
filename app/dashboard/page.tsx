@@ -27,6 +27,7 @@ import {
   Globe
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -41,6 +42,9 @@ export default function DashboardPage() {
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeType, setActiveType] = useState<string | undefined>(undefined);
+  const [ratingsNeeded, setRatingsNeeded] = useState(false);
+  const [popularItems, setPopularItems] = useState<any[]>([]);
+  const [popularLoading, setPopularLoading] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -88,8 +92,23 @@ export default function DashboardPage() {
       let baseRecs: RecommendedItem[] = [];
       if (results[0].status === 'fulfilled') {
         baseRecs = results[0].value.recommendations || [];
+        setRatingsNeeded(false);
       } else {
         console.warn('Recommendations failed to load:', results[0]);
+        const err = results[0].reason;
+        if (err && err.message && (err.message.includes('rate at least 5') || err.message.includes('rating') || err.message.includes('threshold'))) {
+          setRatingsNeeded(true);
+          // Fetch popular items for the taste profiling interface
+          try {
+            setPopularLoading(true);
+            const pop = await itemsAPI.getPopular(undefined, 8);
+            setPopularItems(pop.items || []);
+          } catch (e) {
+            console.error('Failed to fetch popular items:', e);
+          } finally {
+            setPopularLoading(false);
+          }
+        }
         // Try cold-start fallback (popular/cached)
         try {
           const cold = await recommendationsAPI.getColdStart(undefined, 8);
@@ -176,7 +195,20 @@ export default function DashboardPage() {
       toast.success('Recommendations refreshed!', {
         description: user.role === 'admin' ? 'Free for admin' : '-1 credit',
       });
-    } catch (error) {
+    } catch (error: any) {
+      if (error && error.message && (error.message.includes('rate at least 5') || error.message.includes('rating') || error.message.includes('threshold'))) {
+        setRatingsNeeded(true);
+        // Fetch popular items
+        try {
+          setPopularLoading(true);
+          const pop = await itemsAPI.getPopular(undefined, 8);
+          setPopularItems(pop.items || []);
+        } catch (e) {
+          console.error('Failed to fetch popular items:', e);
+        } finally {
+          setPopularLoading(false);
+        }
+      }
       // Attempt cold-start fallback when personalized recs fail
       try {
         const cold = await recommendationsAPI.getColdStart(type, 8);
@@ -249,274 +281,388 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#09090b] text-white relative overflow-hidden">
+      {/* Immersive Rotating Ambient Blur Nodes */}
+      <div className="absolute top-20 left-10 w-96 h-96 bg-violet-600/10 rounded-full blur-[150px] -z-10 animate-pulse pointer-events-none" />
+      <div className="absolute top-1/3 right-10 w-[500px] h-[500px] bg-fuchsia-600/10 rounded-full blur-[180px] -z-10 pointer-events-none" />
+      <div className="absolute bottom-20 left-1/3 w-80 h-80 bg-cyan-600/10 rounded-full blur-[130px] -z-10 pointer-events-none animate-pulse" />
+
       <Navbar />
       
-      <main className="container py-8">
-        {/* Welcome Header */}
-        {/* Welcome Header */}
-        <div className="relative mb-12 p-8 md:p-12 rounded-[40px] overflow-hidden border border-white/5 bg-white/5 backdrop-blur-xl group">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[80px] -mr-32 -mt-32 transition-colors group-hover:bg-primary/20" />
-          <div className="relative z-10 max-w-2xl">
-            <h1 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 italic">
-              {t('dashboard.welcome', { name: user?.username })}
-            </h1>
-            <p className="text-base text-muted-foreground leading-relaxed">
-              {t('dashboard.description')}
-            </p>
+      <main className="container py-8 max-w-7xl relative z-10 space-y-12">
+        {/* Dynamic Premium Glass Console Hero Banner */}
+        <div className="relative p-8 md:p-12 rounded-[32px] border border-white/5 bg-gradient-to-br from-[#121214]/90 via-[#18181b]/80 to-[#121214]/90 backdrop-blur-3xl group shadow-[0_30px_70px_rgba(0,0,0,0.8)] hover:shadow-violet-500/5 transition-all duration-700 hover:border-violet-500/20">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-violet-600/15 rounded-full blur-[120px] -mr-32 -mt-32 transition-all duration-1000 group-hover:bg-violet-600/25 group-hover:scale-110 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-cyan-500/5 rounded-full blur-[100px] -ml-32 -mb-32 transition-all duration-1000 group-hover:bg-cyan-500/15 pointer-events-none" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+            <div className="space-y-4 max-w-2xl">
+              <span className="inline-flex items-center gap-2 text-[10px] tracking-widest font-black text-violet-400 bg-violet-400/10 border border-violet-400/20 px-3.5 py-1.5 rounded-full uppercase leading-none shadow-[0_0_15px_rgba(167,139,250,0.1)]">
+                <Brain className="h-3 w-3 animate-pulse" /> AI TASTE CONTROLLER
+              </span>
+              
+              <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-none italic bg-gradient-to-r from-white via-violet-100 to-fuchsia-200 bg-clip-text text-transparent">
+                {t('dashboard.welcome', { name: user?.username })}
+              </h1>
+              
+              <p className="text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl font-medium">
+                {t('dashboard.description') || "Your personalized AI recommendation dashboard, trained on hybrid filtering algorithms."}
+              </p>
+            </div>
+
+            {/* Quick Session Console Info */}
+            <div className="flex flex-row md:flex-col items-center gap-4 bg-white/5 border border-white/5 rounded-2xl p-4 md:p-6 backdrop-blur-md shadow-inner md:min-w-[200px] justify-between">
+              <div className="text-left w-full">
+                <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest block mb-0.5">CURRENT TASTE LEVEL</span>
+                <span className="text-2xl font-black text-white italic">HYBRID AI v2</span>
+              </div>
+              <div className="h-px w-full bg-white/5 hidden md:block" />
+              <div className="text-left w-full">
+                <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest block mb-0.5">ALGORITHM IN USE</span>
+                <span className="text-xs font-bold text-violet-400 bg-violet-400/10 border border-violet-400/20 px-2 py-0.5 rounded-full inline-block mt-1">COLLABORATIVE</span>
+              </div>
+            </div>
           </div>
         </div>
 
+        {/* Breathtaking Glass Console Stats Cards */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          
+          <div className="relative group overflow-hidden rounded-[24px] border border-white/5 bg-gradient-to-b from-white/5 to-transparent backdrop-blur-xl p-6 transition-all duration-300 hover:border-violet-500/20 hover:from-white/10 hover:shadow-[0_15px_30px_-10px_rgba(139,92,246,0.15)]">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none group-hover:bg-violet-500/20 transition-all" />
+            <div className="flex items-center justify-between mb-4">
+              <div className="rounded-2xl bg-violet-500/10 border border-violet-500/20 p-3 shadow-inner">
+                <Star className="h-6 w-6 text-violet-400 fill-violet-400/20" />
+              </div>
+              <span className="text-[10px] font-black tracking-widest text-violet-400/60 uppercase">RATINGS</span>
+            </div>
+            <p className="text-sm font-medium text-muted-foreground mb-1">{t('dashboard.stats_ratings')}</p>
+            <p className="text-3xl font-black text-white italic tracking-tight">{userStats?.total_ratings || 0}</p>
+          </div>
+          
+          <div className="relative group overflow-hidden rounded-[24px] border border-white/5 bg-gradient-to-b from-white/5 to-transparent backdrop-blur-xl p-6 transition-all duration-300 hover:border-rose-500/20 hover:from-white/10 hover:shadow-[0_15px_30px_-10px_rgba(244,63,94,0.15)]">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none group-hover:bg-rose-500/20 transition-all" />
+            <div className="flex items-center justify-between mb-4">
+              <div className="rounded-2xl bg-rose-500/10 border border-rose-500/20 p-3 shadow-inner">
+                <Heart className="h-6 w-6 text-rose-400 fill-rose-400/20" />
+              </div>
+              <span className="text-[10px] font-black tracking-widest text-rose-400/60 uppercase">WISHLIST</span>
+            </div>
+            <p className="text-sm font-medium text-muted-foreground mb-1">{t('dashboard.stats_wishlist')}</p>
+            <p className="text-3xl font-black text-white italic tracking-tight">{userStats?.wishlist_items || 0}</p>
+          </div>
+          
+          <div className="relative group overflow-hidden rounded-[24px] border border-white/5 bg-gradient-to-b from-white/5 to-transparent backdrop-blur-xl p-6 transition-all duration-300 hover:border-emerald-500/20 hover:from-white/10 hover:shadow-[0_15px_30px_-10px_rgba(16,185,129,0.15)]">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none group-hover:bg-emerald-500/20 transition-all" />
+            <div className="flex items-center justify-between mb-4">
+              <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-3 shadow-inner">
+                <TrendingUp className="h-6 w-6 text-emerald-400" />
+              </div>
+              <span className="text-[10px] font-black tracking-widest text-emerald-400/60 uppercase">AVERAGE</span>
+            </div>
+            <p className="text-sm font-medium text-muted-foreground mb-1">{t('dashboard.stats_avg_rating')}</p>
+            <p className="text-3xl font-black text-white italic tracking-tight">
+              {userStats?.average_rating?.toFixed(1) || '0.0'} <span className="text-sm font-black text-amber-400">★</span>
+            </p>
+          </div>
 
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          
-          <Card className="bg-white/5 backdrop-blur-md border-white/5 shadow-2xl transition-all duration-500 hover:shadow-indigo-500/5 hover:border-indigo-500/20">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="rounded-full bg-indigo-500/10 p-3">
-                <Star className="h-6 w-6 text-indigo-500" />
+          <div className="relative group overflow-hidden rounded-[24px] border border-white/5 bg-gradient-to-b from-white/5 to-transparent backdrop-blur-xl p-6 transition-all duration-300 hover:border-cyan-500/20 hover:from-white/10 hover:shadow-[0_15px_30px_-10px_rgba(6,182,212,0.15)]">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none group-hover:bg-cyan-500/20 transition-all" />
+            <div className="flex items-center justify-between mb-4">
+              <div className="rounded-2xl bg-cyan-500/10 border border-cyan-500/20 p-3 shadow-inner">
+                <Coins className="h-6 w-6 text-cyan-400" />
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">{t('dashboard.stats_ratings')}</p>
-                <p className="text-2xl font-bold">{userStats?.total_ratings || 0}</p>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-white/5 backdrop-blur-md border-white/5 shadow-2xl transition-all duration-500 hover:shadow-rose-500/5 hover:border-rose-500/20">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="rounded-full bg-rose-500/10 p-3">
-                <Heart className="h-6 w-6 text-rose-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">{t('dashboard.stats_wishlist')}</p>
-                <p className="text-2xl font-bold">{userStats?.wishlist_items || 0}</p>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-white/5 backdrop-blur-md border-white/5 shadow-2xl transition-all duration-500 hover:shadow-primary/5 hover:border-primary/20">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="rounded-full bg-emerald-500/10 p-3">
-                <TrendingUp className="h-6 w-6 text-emerald-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">{t('dashboard.stats_avg_rating')}</p>
-                <p className="text-2xl font-bold">
-                  {userStats?.average_rating?.toFixed(1) || '0.0'}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+              <Link href="/credits">
+                <Button size="xs" variant="outline" className="text-[9px] h-6 px-2 bg-cyan-500/10 border-cyan-500/20 hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 transition-all uppercase tracking-widest font-black">
+                  + Add
+                </Button>
+              </Link>
+            </div>
+            <p className="text-sm font-medium text-muted-foreground mb-1">{t('dashboard.stats_credits')}</p>
+            <p className="text-3xl font-black text-white italic tracking-tight">{user?.credits ?? 0}</p>
+          </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid gap-4 md:grid-cols-3 mb-8">
+        {/* Glowing Interactive Quick Actions */}
+        <div className="grid gap-6 md:grid-cols-3">
+          
           <Link href="/browse?type=movie">
-            <Card className="cursor-pointer transition-colors hover:bg-secondary/50">
-              <CardContent className="flex items-center gap-4 p-6">
-                <div className="rounded-lg bg-blue-500/10 p-2">
-                  <Film className="h-5 w-5 text-blue-500" />
+            <div className="group relative overflow-hidden rounded-[24px] border border-white/5 bg-gradient-to-r from-blue-950/20 to-[#121214] p-6 hover:border-blue-500/30 transition-all duration-300 hover:shadow-[0_10px_30px_-15px_rgba(59,130,246,0.3)] hover:-translate-y-1">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-[40px] pointer-events-none" />
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-2xl bg-blue-500/15 border border-blue-500/20 p-3 shadow-inner">
+                    <Film className="h-6 w-6 text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-lg text-white group-hover:text-blue-400 transition-colors">{t('dashboard.action_movies')}</h3>
+                    <p className="text-xs text-muted-foreground font-medium">{userStats?.movie_ratings || 0} Rated Movies</p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="font-medium">{t('dashboard.action_movies')}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {userStats?.movie_ratings || 0} rated
-                  </p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              </CardContent>
-            </Card>
+                <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-blue-400 transition-all group-hover:translate-x-1" />
+              </div>
+            </div>
           </Link>
           
           <Link href="/browse?type=music">
-            <Card className="cursor-pointer transition-colors hover:bg-secondary/50">
-              <CardContent className="flex items-center gap-4 p-6">
-                <div className="rounded-lg bg-cyan-500/10 p-2">
-                  <Music className="h-5 w-5 text-cyan-500" />
+            <div className="group relative overflow-hidden rounded-[24px] border border-white/5 bg-gradient-to-r from-cyan-950/20 to-[#121214] p-6 hover:border-cyan-500/30 transition-all duration-300 hover:shadow-[0_10px_30px_-15px_rgba(6,182,212,0.3)] hover:-translate-y-1">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-[40px] pointer-events-none" />
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-2xl bg-cyan-500/15 border border-cyan-500/20 p-3 shadow-inner">
+                    <Music className="h-6 w-6 text-cyan-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-lg text-white group-hover:text-cyan-400 transition-colors">{t('dashboard.action_music')}</h3>
+                    <p className="text-xs text-muted-foreground font-medium">{userStats?.music_ratings || 0} Rated Tracks</p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="font-medium">{t('dashboard.action_music')}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {userStats?.music_ratings || 0} rated
-                  </p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              </CardContent>
-            </Card>
+                <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-cyan-400 transition-all group-hover:translate-x-1" />
+              </div>
+            </div>
           </Link>
           
           <Link href="/browse?type=book">
-            <Card className="cursor-pointer transition-colors hover:bg-secondary/50">
-              <CardContent className="flex items-center gap-4 p-6">
-                <div className="rounded-lg bg-emerald-500/10 p-2">
-                  <BookOpen className="h-5 w-5 text-emerald-500" />
+            <div className="group relative overflow-hidden rounded-[24px] border border-white/5 bg-gradient-to-r from-emerald-950/20 to-[#121214] p-6 hover:border-emerald-500/30 transition-all duration-300 hover:shadow-[0_10px_30px_-15px_rgba(16,185,129,0.3)] hover:-translate-y-1">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-[40px] pointer-events-none" />
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-2xl bg-emerald-500/15 border border-emerald-500/20 p-3 shadow-inner">
+                    <BookOpen className="h-6 w-6 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-lg text-white group-hover:text-emerald-400 transition-colors">{t('dashboard.action_books')}</h3>
+                    <p className="text-xs text-muted-foreground font-medium">{userStats?.book_ratings || 0} Rated Books</p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="font-medium">{t('dashboard.action_books')}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {userStats?.book_ratings || 0} rated
+                <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-emerald-400 transition-all group-hover:translate-x-1" />
+              </div>
+            </div>
+          </Link>
+
+        </div>
+
+        {/* Platform Premium Features */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          
+          <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all">
+            <div className="rounded-xl bg-violet-500/10 p-2.5">
+              <Brain className="h-5 w-5 text-violet-400" />
+            </div>
+            <div className="truncate">
+              <p className="font-bold text-xs text-violet-400">{t('features.ai_title')}</p>
+              <p className="text-[10px] text-muted-foreground truncate">{t('features.ai_desc')}</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all">
+            <div className="rounded-xl bg-amber-500/10 p-2.5">
+              <Music className="h-5 w-5 text-amber-400" />
+            </div>
+            <div className="truncate">
+              <p className="font-bold text-xs text-amber-400">{t('features.eth_title')}</p>
+              <p className="text-[10px] text-muted-foreground truncate">{t('features.eth_desc')}</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all">
+            <div className="rounded-xl bg-purple-500/10 p-2.5">
+              <Film className="h-5 w-5 text-purple-400" />
+            </div>
+            <div className="truncate">
+              <p className="font-bold text-xs text-purple-400">{t('features.cross_title')}</p>
+              <p className="text-[10px] text-muted-foreground truncate">{t('features.cross_desc')}</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all">
+            <div className="rounded-xl bg-blue-500/10 p-2.5">
+              <Coins className="h-5 w-5 text-blue-400" />
+            </div>
+            <div className="truncate">
+              <p className="font-bold text-xs text-blue-400">{t('features.credits_title')}</p>
+              <p className="text-[10px] text-muted-foreground truncate">{t('features.credits_desc')}</p>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Premium Recommendations Card Panel */}
+        <div id="recommendations" className="scroll-mt-24 rounded-[32px] border border-white/5 bg-gradient-to-b from-[#121214]/80 to-[#09090b]/80 backdrop-blur-2xl shadow-3xl overflow-hidden">
+          <div className="p-6 md:p-8 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-black tracking-tighter italic text-white flex items-center gap-2">
+                <Brain className="h-6 w-6 text-violet-400" />
+                {t('dashboard.recs_title') || "AI RECOMMENDATIONS"}
+              </h2>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold mt-1">
+                {t('dashboard.recs_desc') || "Personalized AI-powered picks (1 credit per refresh)"}
+              </p>
+            </div>
+            
+            <Button 
+              onClick={() => refreshRecommendations(activeType)}
+              disabled={isRefreshing || (user?.role !== 'admin' && (user?.credits || 0) < 1)}
+              className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_25px_rgba(139,92,246,0.5)] transition-all font-black text-xs uppercase px-4"
+            >
+              {isRefreshing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin text-white" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4 text-white" />
+              )}
+              {t('dashboard.refresh')}
+            </Button>
+          </div>
+
+          <div className="p-6 md:p-8">
+            {ratingsNeeded ? (
+              <div className="relative overflow-hidden rounded-[32px] border border-white/5 bg-gradient-to-b from-white/5 to-transparent backdrop-blur-xl p-8 md:p-12 text-center shadow-2xl">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-80 bg-primary/10 rounded-full blur-[100px] -z-10" />
+                
+                <div className="mx-auto w-16 h-16 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-6 shadow-inner animate-bounce">
+                  <Brain className="h-8 w-8 text-primary" />
+                </div>
+                
+                <h3 className="text-2xl md:text-3xl font-black tracking-tight text-white mb-2 italic">
+                  AI RECOMMENDATIONS LOCKED 🔒
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto mb-8 leading-relaxed">
+                  Our advanced hybrid algorithm builds recommendations personalized to your exact taste. Submit at least 5 ratings to unlock your custom feed!
+                </p>
+                
+                {/* Progress Tracker */}
+                <div className="max-w-md mx-auto bg-white/5 border border-white/5 rounded-3xl p-6 mb-12 shadow-lg backdrop-blur-md">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-xs uppercase tracking-wider font-bold text-muted-foreground">Taste Profiling Progress</span>
+                    <span className="text-sm font-black text-primary">{(userStats?.total_ratings || 0)} / 5 Rated</span>
+                  </div>
+                  
+                  {/* Progress Bar */}
+                  <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                    <div 
+                      className="h-full bg-gradient-to-r from-rose-500 via-yellow-400 to-emerald-500 transition-all duration-1000 shadow-[0_0_12px_rgba(234,179,8,0.3)]"
+                      style={{ width: `${Math.min(((userStats?.total_ratings || 0) / 5) * 100, 100)}%` }}
+                    />
+                  </div>
+                  
+                  <p className="text-xs text-muted-foreground mt-4 font-medium italic">
+                    {(userStats?.total_ratings || 0) >= 5 ? "Tastes analyzed! Unlocking..." : `Rate ${5 - (userStats?.total_ratings || 0)} more item(s) to unlock.`}
                   </p>
                 </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-        
-        {/* Platform Features */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card className="bg-white/5 backdrop-blur-md border-white/5 shadow-xl transition-all hover:shadow-teal-500/5 hover:border-teal-500/20">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="rounded-full bg-teal-500/10 p-3">
-                <Brain className="h-6 w-6 text-teal-500" />
+                
+                {/* Quick Rate Section */}
+                <div>
+                  <h4 className="text-sm uppercase tracking-widest font-black text-white mb-6">
+                    ✨ QUICKLY RATE THESE POPULAR ITEMS TO UNLOCK
+                  </h4>
+                  
+                  {popularLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  ) : (
+                    <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-4 max-w-4xl mx-auto">
+                      {popularItems.slice(0, 4).map((item) => (
+                        <QuickRateCard key={item.id} item={item} onRated={fetchDashboardData} />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-teal-500">{t('features.ai_title')}</p>
-                <p className="text-xs text-muted-foreground line-clamp-1">{t('features.ai_desc')}</p>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-white/5 backdrop-blur-md border-white/5 shadow-xl transition-all hover:shadow-amber-500/5 hover:border-amber-500/20">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="rounded-full bg-amber-500/10 p-3">
-                <Music className="h-6 w-6 text-amber-500" />
-              </div>
-              <div>
-                <p className="font-semibold text-amber-500">{t('features.eth_title')}</p>
-                <p className="text-xs text-muted-foreground line-clamp-1">{t('features.eth_desc')}</p>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-white/5 backdrop-blur-md border-white/5 shadow-xl transition-all hover:shadow-purple-500/5 hover:border-purple-500/20">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="rounded-full bg-purple-500/10 p-3">
-                <Film className="h-6 w-6 text-purple-500" />
-              </div>
-              <div>
-                <p className="font-semibold text-purple-500">{t('features.cross_title')}</p>
-                <p className="text-xs text-muted-foreground line-clamp-1">{t('features.cross_desc')}</p>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-white/5 backdrop-blur-md border-white/5 shadow-xl transition-all hover:shadow-blue-500/5 hover:border-blue-500/20">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="rounded-full bg-blue-500/10 p-3">
-                <Coins className="h-6 w-6 text-blue-500" />
-              </div>
-              <div>
-                <p className="font-semibold text-blue-500">{t('features.credits_title')}</p>
-                <p className="text-xs text-muted-foreground line-clamp-1">{t('features.credits_desc')}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recommendations Section */}
-        <Card id="recommendations" className="scroll-mt-24">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                  {t('dashboard.recs_title')}
-                <CardDescription>
-                  {t('dashboard.recs_desc')}
-                </CardDescription>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => refreshRecommendations(activeType)}
-                disabled={isRefreshing || (user?.role !== 'admin' && (user?.credits || 0) < 1)}
-              >
-                {isRefreshing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                )}
-                {t('dashboard.refresh')}
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="all" className="w-full">
-              <TabsList className="mb-6">
-                <TabsTrigger value="all" onClick={() => setActiveType(undefined)}>
-                  {t('dashboard.tab_all')}
-                </TabsTrigger>
-                <TabsTrigger value="movie" onClick={() => setActiveType('movie')}>
-                  <Film className="mr-1 h-4 w-4" />
-                  {t('dashboard.tab_movies')}
-                </TabsTrigger>
-                <TabsTrigger value="music" onClick={() => setActiveType('music')}>
-                  <Music className="mr-1 h-4 w-4" />
-                  {t('dashboard.tab_music')}
-                </TabsTrigger>
-                <TabsTrigger value="book" onClick={() => setActiveType('book')}>
-                  <BookOpen className="mr-1 h-4 w-4" />
-                  {t('dashboard.tab_books')}
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="all" className="mt-0">
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : recommendations.length > 0 ? (
-                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                    {recommendations.map((item) => (
-                      <ItemCard 
-                        key={item.id} 
-                        item={item} 
-                        showScore
-                        score={item.score}
-                        explanation={item.explanation}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <Brain className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-                    <h3 className="text-lg font-medium mb-2">{t('dashboard.no_recs')}</h3>
-                    <p className="text-muted-foreground mb-4">
-                      {t('dashboard.rate_to_get_recs')}
-                    </p>
-                    <Link href="/browse">
-                      <Button>{t('dashboard.start_browsing')}</Button>
-                    </Link>
-                  </div>
-                )}
-              </TabsContent>
-
-              {['movie', 'music', 'book'].map((type) => (
-                <TabsContent key={type} value={type} className="mt-0">
+            ) : (
+              <Tabs defaultValue="all" className="w-full">
+                <TabsList className="mb-8 bg-white/5 border border-white/5 p-1 rounded-2xl gap-2 w-full max-w-lg flex overflow-x-auto">
+                  <TabsTrigger 
+                    value="all" 
+                    onClick={() => setActiveType(undefined)} 
+                    className="flex-1 py-2.5 rounded-xl text-xs uppercase tracking-wider font-bold data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-fuchsia-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
+                  >
+                    {t('dashboard.tab_all')}
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="movie" 
+                    onClick={() => setActiveType('movie')}
+                    className="flex-1 py-2.5 rounded-xl text-xs uppercase tracking-wider font-bold data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-fuchsia-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
+                  >
+                    <Film className="mr-2 h-4 w-4" />
+                    {t('dashboard.tab_movies')}
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="music" 
+                    onClick={() => setActiveType('music')}
+                    className="flex-1 py-2.5 rounded-xl text-xs uppercase tracking-wider font-bold data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-fuchsia-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
+                  >
+                    <Music className="mr-2 h-4 w-4" />
+                    {t('dashboard.tab_music')}
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="book" 
+                    onClick={() => setActiveType('book')}
+                    className="flex-1 py-2.5 rounded-xl text-xs uppercase tracking-wider font-bold data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-fuchsia-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
+                  >
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    {t('dashboard.tab_books')}
+                  </TabsTrigger>
+                </TabsList>
+  
+                <TabsContent value="all" className="mt-0">
                   {isLoading ? (
                     <div className="flex items-center justify-center py-12">
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     </div>
-                  ) : (
+                  ) : recommendations.length > 0 ? (
                     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                      {recommendations
-                        .filter((item) => item.item_type === type)
-                        .map((item) => (
-                          <ItemCard 
-                            key={item.id} 
-                            item={item} 
-                            showScore
-                            score={item.score}
-                            explanation={item.explanation}
-                          />
-                        ))}
+                      {recommendations.map((item) => (
+                        <ItemCard 
+                          key={item.id} 
+                          item={item} 
+                          showScore
+                          score={item.score}
+                          explanation={item.explanation}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <Brain className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
+                      <h3 className="text-lg font-medium mb-2">{t('dashboard.no_recs')}</h3>
+                      <p className="text-muted-foreground mb-4">
+                        {t('dashboard.rate_to_get_recs')}
+                      </p>
+                      <Link href="/browse">
+                        <Button>{t('dashboard.start_browsing')}</Button>
+                      </Link>
                     </div>
                   )}
                 </TabsContent>
-              ))}
-            </Tabs>
-          </CardContent>
-        </Card>
+  
+                {['movie', 'music', 'book'].map((type) => (
+                  <TabsContent key={type} value={type} className="mt-0">
+                    {isLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                    ) : (
+                      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                        {recommendations
+                          .filter((item) => item.item_type === type)
+                          .map((item) => (
+                            <ItemCard 
+                              key={item.id} 
+                              item={item} 
+                              showScore
+                              score={item.score}
+                              explanation={item.explanation}
+                            />
+                          ))}
+                      </div>
+                    )}
+                  </TabsContent>
+                ))}
+              </Tabs>
+            )}
+          </div>
+        </div>
 
         {/* Global Discovery Section */}
         <div className="mt-16 mb-12">
@@ -653,3 +799,79 @@ function DiscoveryGrid({ items, loading, onSync }: { items: any[], loading: bool
     </div>
   );
 }
+
+function QuickRateCard({ item, onRated }: { item: any; onRated: () => void }) {
+  const [hoverRating, setHoverRating] = useState(0);
+  const [rating, setRating] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imgError, setImgError] = useState(false);
+
+  const handleRate = async (val: number) => {
+    setRating(val);
+    setIsSubmitting(true);
+    const toastId = toast.loading(`Submitting rating for ${item.title}...`);
+    try {
+      await usersAPI.rateItem(item.id, val, 'Quick taste profiling rating');
+      toast.success(`Rated ${item.title} ${val}/5 Stars!`, { id: toastId });
+      // Call parent onRated
+      onRated();
+    } catch (e: any) {
+      toast.error(e.message || 'Rating submission failed', { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg border-white/5 bg-white/5 backdrop-blur-md flex flex-col h-full text-left">
+      <div className="relative aspect-[3/4] overflow-hidden bg-muted">
+        {item.cover_image && !imgError ? (
+          <img
+            src={item.cover_image}
+            alt={item.title}
+            onError={() => setImgError(true)}
+            className="h-full w-full object-cover transition-transform group-hover:scale-105 duration-500"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary/50 to-background animate-pulse">
+            <Star className="h-10 w-10 text-muted-foreground/30" />
+          </div>
+        )}
+      </div>
+      <CardContent className="p-3 flex-1 flex flex-col justify-between">
+        <div>
+          <h5 className="font-bold text-sm text-white truncate line-clamp-1 mb-0.5">{item.title}</h5>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold opacity-70 mb-2">{item.item_type}</p>
+        </div>
+        
+        {/* Star Rating Selector */}
+        <div className="flex items-center justify-center gap-1 mt-2">
+          {isSubmitting ? (
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          ) : (
+            [1, 2, 3, 4, 5].map((val) => (
+              <button
+                key={val}
+                disabled={isSubmitting}
+                className="transition-transform active:scale-95 hover:scale-110"
+                onMouseEnter={() => setHoverRating(val)}
+                onMouseLeave={() => setHoverRating(0)}
+                onClick={() => handleRate(val)}
+              >
+                <Star
+                  className={cn(
+                    "h-5 w-5 stroke-1 transition-all duration-200",
+                    (hoverRating || rating) >= val
+                      ? "fill-amber-400 stroke-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]"
+                      : "text-muted-foreground/40 hover:text-amber-300"
+                  )}
+                />
+              </button>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+

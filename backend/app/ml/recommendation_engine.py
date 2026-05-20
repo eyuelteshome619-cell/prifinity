@@ -344,7 +344,9 @@ class RecommendationEngine:
         items = execute_query(query, tuple(params))
         
         for item in items:
-            item['score'] = (item['popularity_score'] + item['avg_rating'] * 20) / 120
+            pop = item.get('popularity_score') or 0
+            avg = item.get('avg_rating') or 0
+            item['score'] = (pop + avg * 20) / 120
             item['explanation'] = 'Popular and highly rated'
         
         return items

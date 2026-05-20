@@ -334,6 +334,8 @@ def handle_update(db, sql, params):
                 param_idx += 1
         elif val_str.upper() == "NULL":
             update_doc[col] = None
+        elif val_str.upper() == "CURRENT_TIMESTAMP":
+            update_doc[col] = datetime.utcnow()
         elif (val_str.startswith("'") and val_str.endswith("'")) or (val_str.startswith('"') and val_str.endswith('"')):
             update_doc[col] = val_str[1:-1]
         else:
@@ -639,7 +641,7 @@ def handle_select(db, sql, params):
         return results, None, len(results)
 
     # 4. STANDARD SELECT
-    where_match = re.search(r"where\s+(.+?)(?:group\s+by|order\s+by|limit|$)", sql, re.IGNORECASE)
+    where_match = re.search(r"where\s+(.+?)(?:group\s+by|order\s+by|limit|$)", sql, re.IGNORECASE | re.DOTALL)
     filter_doc = {}
     if where_match:
         where_clause = where_match.group(1).strip()
@@ -705,12 +707,13 @@ def parse_where_clause(where_clause, params):
     if "or" in where_clause.lower() and len(params) >= 2:
         return {"$or": [{"email": params[0]}, {"username": params[1]}]}
         
-    # Extract comparison pairs
-    matches = re.findall(r"(\w+)\s*(=|>|<|like|in)\s*(%s|'[^']*'|\d+)", where_clause, re.IGNORECASE)
+    matches = re.findall(r"(\w+)\s*(=|>|<|!=|like|in)\s*(%s|'[^']*'|\d+|true|false|null)", where_clause, re.IGNORECASE)
     
     param_idx = 0
     for col, op, val_str in matches:
         col = col.lower()
+        if col.isdigit():
+            continue
         if col == "id":
             col = "_id"
             
@@ -720,6 +723,12 @@ def parse_where_clause(where_clause, params):
                 param_idx += 1
             else:
                 continue
+        elif val_str.lower() == "true":
+            val = {"$in": [True, 1]}
+        elif val_str.lower() == "false":
+            val = {"$in": [False, 0]}
+        elif val_str.lower() == "null":
+            val = None
         elif val_str.startswith("'") and val_str.endswith("'"):
             val = val_str[1:-1]
         else:
@@ -738,6 +747,8 @@ def parse_where_clause(where_clause, params):
         op = op.lower()
         if op == "=":
             filter_doc[col] = val
+        elif op == "!=":
+            filter_doc[col] = {"$ne": val}
         elif op == ">":
             filter_doc[col] = {"$gt": val}
         elif op == "<":

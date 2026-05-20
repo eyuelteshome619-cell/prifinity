@@ -54,7 +54,7 @@ class MediaAPIService:
     @staticmethod
     def _search_tmdb(query):
         api_key = MediaAPIService._get_config('TMDB_API_KEY')
-        if not api_key: return []
+        if not api_key: return MediaAPIService._search_tvmaze(query)
         
         url = "https://api.themoviedb.org/3/search/movie"
         params = {"api_key": api_key, "query": query, "language": "en-US"}
@@ -83,6 +83,38 @@ class MediaAPIService:
                 return results
         except Exception as e:
             print(f"TMDB Search Error: {e}")
+        return MediaAPIService._search_tvmaze(query)
+
+    @staticmethod
+    def _search_tvmaze(query):
+        url = "https://api.tvmaze.com/search/shows"
+        params = {"q": query}
+        try:
+            resp = requests.get(url, params=params, timeout=6)
+            if resp.status_code == 200:
+                results = []
+                for item in resp.json()[:20]:
+                    show = item.get('show', {})
+                    if not show.get('image') or not show['image'].get('original'): continue
+                    
+                    desc = show.get('summary', 'No description available.') or 'No description available.'
+                    desc = desc.replace('<p>', '').replace('</p>', '').replace('<b>', '').replace('</b>', '')
+                    
+                    results.append({
+                        'external_id': f"tvmaze_{show['id']}",
+                        'title': show.get('name'),
+                        'description': desc,
+                        'genre': show.get('genres', ['Movie'])[0] if show.get('genres') else 'Movie',
+                        'item_type': 'movie',
+                        'cover_image': show['image']['original'],
+                        'release_year': show.get('premiered', '')[:4] if show.get('premiered') else '',
+                        'creator': 'Network: ' + show['network']['name'] if show.get('network') else 'Unknown',
+                        'popularity': int(show.get('weight', 0)),
+                        'streaming_links': [{'provider': 'tvmaze', 'url': show.get('url')}]
+                    })
+                return results
+        except Exception as e:
+            print(f"TVmaze Search Error: {e}")
         return []
 
     @staticmethod
@@ -121,6 +153,36 @@ class MediaAPIService:
                 return results
         except Exception as e:
             print(f"Book Search Error: {e}")
+        return MediaAPIService._search_openlibrary(query)
+
+    @staticmethod
+    def _search_openlibrary(query):
+        url = "https://openlibrary.org/search.json"
+        params = {"q": query, "limit": 20}
+        try:
+            resp = requests.get(url, params=params, timeout=6)
+            if resp.status_code == 200:
+                results = []
+                for b in resp.json().get('docs', []):
+                    if not b.get('cover_i'): continue
+                    
+                    creator = b.get('author_name', ['Unknown'])[0] if b.get('author_name') else 'Unknown'
+                    
+                    results.append({
+                        'external_id': f"ol_{str(b.get('key', '')).replace('/', '_')}",
+                        'title': b.get('title'),
+                        'description': 'No description available.',
+                        'genre': 'Book',
+                        'item_type': 'book',
+                        'cover_image': f"https://covers.openlibrary.org/b/id/{b['cover_i']}-L.jpg",
+                        'release_year': str(b.get('first_publish_year', ''))[:4],
+                        'creator': creator,
+                        'popularity': 60,
+                        'streaming_links': [{'provider': 'openlibrary', 'url': f"https://openlibrary.org{b.get('key', '')}"}]
+                    })
+                return results
+        except Exception as e:
+            print(f"OpenLibrary Search Error: {e}")
         return []
 
     @staticmethod

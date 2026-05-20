@@ -30,6 +30,66 @@ import json
 recommendations_bp = Blueprint('recommendations', __name__)
 
 
+def sort_ethiopian_first(recommendations):
+    """Ensure Ethiopian items always come first in the recommendation list"""
+    if not recommendations:
+        return recommendations
+        
+    try:
+        # Extract item IDs
+        ids = []
+        for r in recommendations:
+            rid = r.get('id') or r.get('item_id')
+            if rid:
+                try:
+                    ids.append(int(rid))
+                except Exception:
+                    pass
+                    
+        if not ids:
+            return recommendations
+            
+        # Query database to check which IDs are Ethiopian
+        placeholders = ','.join(['%s'] * len(ids))
+        rows = execute_query(f"SELECT id, is_ethiopian FROM items WHERE id IN ({placeholders})", tuple(ids))
+        
+        # Create mapping of id -> is_ethiopian (both boolean and int check)
+        eth_map = {}
+        for row in rows:
+            val = row.get('is_ethiopian')
+            if isinstance(val, str):
+                is_eth = val.lower() in ('true', '1')
+            else:
+                is_eth = bool(val)
+            eth_map[row['id']] = is_eth
+        
+        # Partition the recommendations
+        eth_recs = []
+        other_recs = []
+        
+        for r in recommendations:
+            rid = r.get('id') or r.get('item_id')
+            try:
+                rid_int = int(rid) if rid else None
+            except Exception:
+                rid_int = None
+                
+            r['is_ethiopian'] = eth_map.get(rid_int, False)
+            if r['is_ethiopian']:
+                eth_recs.append(r)
+            else:
+                other_recs.append(r)
+                
+        # Sort both lists by score descending to maintain relevance
+        eth_recs.sort(key=lambda x: x.get('score') or x.get('popularity_score') or 0, reverse=True)
+        other_recs.sort(key=lambda x: x.get('score') or x.get('popularity_score') or 0, reverse=True)
+        
+        return eth_recs + other_recs
+    except Exception as e:
+        print(f"Error sorting Ethiopian first: {e}")
+        return recommendations
+
+
 @recommendations_bp.route('', methods=['GET'])
 @token_required
 @credits_required('recommendation')
@@ -37,6 +97,22 @@ recommendations_bp = Blueprint('recommendations', __name__)
 def get_recommendations():
     """Get personalized recommendations for the current user"""
     user_id = g.current_user['id']
+    
+    # Require at least 5 ratings to unlock personalized recommendations
+    ratings_count_dict = execute_query(
+        "SELECT COUNT(*) as total FROM ratings WHERE user_id = %s",
+        (user_id,),
+        fetch_one=True
+    )
+    ratings_count = ratings_count_dict['total'] if ratings_count_dict else 0
+    
+    if g.current_user.get('role') != 'admin' and ratings_count < 5:
+        return jsonify({
+            'error': f'Please rate at least 5 items first to unlock personalized recommendations. You have currently rated {ratings_count} item(s).',
+            'ratings_count': ratings_count,
+            'requires_ratings': 5
+        }), 400
+        
     item_type = request.args.get('type')  # book, movie, music, or None for all
     limit = min(int(request.args.get('limit', 20)), 50)
     algorithm = request.args.get('algorithm', 'hybrid')  # collaborative, content, hybrid
@@ -184,6 +260,8 @@ def get_recommendations():
         fetch_all=False
     )
     
+    recommendations = sort_ethiopian_first(recommendations)
+    
     response = {
         'recommendations': recommendations,
         'algorithm': algorithm,
@@ -329,6 +407,7 @@ def get_cold_start_recommendations():
             (item_type, limit) if item_type else (limit,)
         )
         recommendations = [{ 'id': r['id'], 'title': r.get('title'), 'score': r.get('popularity_score', 0) } for r in rows]
+    recommendations = sort_ethiopian_first(recommendations)
     
     return jsonify({
         'recommendations': recommendations,

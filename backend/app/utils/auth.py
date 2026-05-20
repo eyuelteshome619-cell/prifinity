@@ -97,12 +97,14 @@ def get_current_user():
     """Get current user from token"""
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
+        print(f"DEBUG AUTH: No valid auth header. Header: {auth_header}")
         return None
     
     token = auth_header.split(' ')[1]
     payload = decode_token(token)
     
     if not payload:
+        print(f"DEBUG AUTH: decode_token returned None for token {token}")
         return None
     
     user = execute_query(
@@ -110,6 +112,8 @@ def get_current_user():
         (payload['user_id'],),
         fetch_one=True
     )
+    if not user:
+        print(f"DEBUG AUTH: No user found for id {payload['user_id']}")
     
     return user
 

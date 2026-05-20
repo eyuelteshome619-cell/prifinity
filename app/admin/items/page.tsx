@@ -245,7 +245,7 @@ export default function AdminItemsPage() {
 
   const filteredItems = items.filter((item) => {
     const matchesSearch =
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.description || "").toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = typeFilter === "all" || item.item_type === typeFilter;
     return matchesSearch && matchesType;

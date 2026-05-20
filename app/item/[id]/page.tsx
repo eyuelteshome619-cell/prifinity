@@ -95,7 +95,7 @@ export default function ItemDetailPage({ params }: PageProps) {
       }
 
       // Check for Last.fm link (previously used spotify_id column)
-      if (itemData.item.item_type === 'music' && itemData.details.spotify_id) {
+      if (itemData.item.item_type === 'music' && itemData.details && itemData.details.spotify_id) {
         setLastfmUrl(itemData.details.spotify_id);
       }
     } catch (error: any) {

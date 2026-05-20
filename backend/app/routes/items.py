@@ -137,19 +137,20 @@ def get_item(item_id):
         return jsonify({'error': 'Item not found'}), 404
     
     # Get type-specific details
-    if item['item_type'] == 'book':
+    item_type = item.get('item_type')
+    if item_type == 'book':
         details = execute_query(
             "SELECT * FROM books WHERE item_id = %s",
             (item_id,),
             fetch_one=True
         )
-    elif item['item_type'] == 'movie':
+    elif item_type == 'movie':
         details = execute_query(
             "SELECT * FROM movies WHERE item_id = %s",
             (item_id,),
             fetch_one=True
         )
-    elif item['item_type'] == 'music':
+    elif item_type == 'music':
         # Some deployments may lack the legacy `spotify_id` column.
         # Use a safe select to avoid raising SQL errors on older DBs.
         details = execute_query(
@@ -162,7 +163,7 @@ def get_item(item_id):
     
     # Get Ethiopian metadata if applicable
     ethiopian_metadata = None
-    if item['is_ethiopian']:
+    if item.get('is_ethiopian'):
         ethiopian_metadata = execute_query(
             "SELECT * FROM ethiopian_content_metadata WHERE item_id = %s",
             (item_id,),
@@ -334,8 +335,14 @@ def get_genres():
     
     genres = execute_query(query, tuple(params))
     
+    # Manually extract and deduplicate genres (in case DISTINCT is not perfectly emulated)
+    genre_set = set()
+    for g in genres:
+        if g.get('genre'):
+            genre_set.add(g.get('genre'))
+            
     return jsonify({
-        'genres': [g['genre'] for g in genres]
+        'genres': sorted(list(genre_set))
     }), 200
 
 
@@ -348,8 +355,13 @@ def get_ethiopian_genres():
            ORDER BY ethiopian_genre"""
     )
     
+    genre_set = set()
+    for g in genres:
+        if g.get('ethiopian_genre'):
+            genre_set.add(g.get('ethiopian_genre'))
+            
     return jsonify({
-        'ethiopian_genres': [g['ethiopian_genre'] for g in genres]
+        'ethiopian_genres': sorted(list(genre_set))
     }), 200
 
 
